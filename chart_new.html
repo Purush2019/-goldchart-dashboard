@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gold Chart — Coinbase Derivatives</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+    <script>
+        if (typeof LightweightCharts === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"><\/script>');
+        }
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #131722; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
+
+        #header { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px; background: #1e222d; border-bottom: 1px solid #2a2e39; height: 42px; }
+        #header .title { font-size: 16px; font-weight: 700; color: #e0e3eb; }
+        #header .title .sym { color: #26a69a; }
+        #header .title .tf { color: #ff9800; font-size: 13px; }
+        .price-wrap { display: flex; align-items: baseline; gap: 10px; }
+        #live-price { font-size: 26px; font-weight: 800; font-family: 'Courier New', monospace; }
+        #live-price.up { color: #26a69a; }
+        #live-price.down { color: #ef5350; }
+        #price-change { font-size: 12px; }
+        #header .info { font-size: 11px; color: #787b86; }
+
+        /* ── Toggle bar (replaces old indicator value bar) ── */
+        #ind-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 16px; background: #181c27; border-bottom: 1px solid #2a2e39; font-size: 11px; min-height: 30px; }
+        .toggle-btn {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 10px; border-radius: 4px;
+            border: 1px solid #2a2e39; background: #1e222d;
+            color: #787b86; font-size: 11px; font-weight: 600;
+            cursor: pointer; user-select: none; -webkit-user-select: none;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .toggle-btn:hover { border-color: #3a3e49; color: #d1d4dc; }
+        .toggle-btn.active { background: #2962ff22; border-color: #2962ff; color: #d1d4dc; }
+        .toggle-btn .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; opacity: 0.4; transition: opacity 0.15s; }
+        .toggle-btn.active .dot { opacity: 1; }
+        .ind-sep { width: 1px; height: 18px; background: #2a2e39; margin: 0 4px; }
+        /* Small indicator values shown inline */
+        .ind-vals { display: flex; gap: 6px 14px; flex-wrap: wrap; margin-left: auto; font-size: 10px; }
+        .iv { display: flex; align-items: center; gap: 3px; }
+        .iv .dot { width: 6px; height: 3px; border-radius: 1px; display: inline-block; }
+        .iv .lbl { color: #787b86; }
+        .iv .val { font-family: monospace; font-weight: 600; }
+
+        #chart { width: 100%; }
+
+        #bot-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 32px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: #1e222d; border-top: 1px solid #2a2e39; font-size: 11px; }
+        #signal-log { display: flex; gap: 8px; overflow: hidden; flex: 1; margin: 0 20px; }
+        .sig-e { padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+        .sig-e.open_long { background: #26a69a22; color: #26a69a; border: 1px solid #26a69a44; }
+        .sig-e.close_long { background: #ff980022; color: #ff9800; border: 1px solid #ff980044; }
+        .sig-e.open_short { background: #ef535022; color: #ef5350; border: 1px solid #ef535044; }
+        .sig-e.close_short { background: #2196f322; color: #2196f3; border: 1px solid #2196f344; }
+
+        #status { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); background: #2962ff; color: white; padding: 8px 22px; border-radius: 6px; font-size: 13px; font-weight: 600; z-index: 100; display: none; box-shadow: 0 4px 20px rgba(41,98,255,0.4); }
+
+        #zoom-controls { position: fixed; right: 16px; bottom: 48px; display: flex; flex-direction: column; gap: 6px; z-index: 90; }
+        #zoom-controls button { width: 38px; height: 38px; border: 1px solid #2a2e39; border-radius: 8px; background: #1e222d; color: #d1d4dc; font-size: 20px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s; box-shadow: 0 2px 8px rgba(0,0,0,0.3); user-select: none; -webkit-user-select: none; }
+        #zoom-controls button:hover { background: #2962ff; color: #fff; }
+        #zoom-controls button:active { background: #1e53e5; transform: scale(0.93); }
+
+        #loading { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #131722; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; }
+        #loading h1 { font-size: 24px; color: #e0e3eb; margin-bottom: 12px; }
+        #loading .sub { font-size: 16px; color: #ff9800; }
+        #loading .hint { font-size: 12px; color: #787b86; margin-top: 8px; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <div class="title">
+            <span id="symbol-name">GOLD</span> <span class="sym">·</span>
+            <span class="tf" id="timeframe">1m</span>
+        </div>
+        <div class="price-wrap">
+            <div id="live-price" class="up">---</div>
+            <div id="price-change" style="color:#787b86"></div>
+        </div>
+        <div class="info">
+            <span id="candle-count">0</span> candles &nbsp;|&nbsp;
+            <span id="signal-count">0</span> signals &nbsp;|&nbsp;
+            <span id="connection" style="color:#ff9800">Connecting...</span>
+        </div>
+    </div>
+
+    <!-- Toggle buttons + compact indicator values -->
+    <div id="ind-bar">
+        <button class="toggle-btn active" data-group="ssl"><span class="dot" style="background:#00bcd4"></span>SSL</button>
+        <button class="toggle-btn active" data-group="ssl2"><span class="dot" style="background:#2196f3"></span>SSL2</button>
+        <button class="toggle-btn active" data-group="ssl3"><span class="dot" style="background:#76ff03"></span>Exit</button>
+        <button class="toggle-btn active" data-group="ema"><span class="dot" style="background:#4caf50"></span>EMA</button>
+        <button class="toggle-btn active" data-group="ut"><span class="dot" style="background:#ff9800"></span>UT Bot</button>
+        <button class="toggle-btn active" data-group="bb"><span class="dot" style="background:#78909c"></span>BB</button>
+        <span class="ind-sep"></span>
+        <button class="toggle-btn" data-group="all" style="color:#2962ff;border-color:#2962ff55">ALL</button>
+        <div class="ind-vals">
+            <div class="iv"><span class="dot" style="background:#00bcd4"></span><span class="lbl">SSL</span><span id="v-ssl-up" class="val" style="color:#00bcd4"></span></div>
+            <div class="iv"><span class="dot" style="background:#4caf50"></span><span class="lbl">EMA9</span><span id="v-ema-f" class="val" style="color:#4caf50"></span></div>
+            <div class="iv"><span class="dot" style="background:#f44336"></span><span class="lbl">EMA21</span><span id="v-ema-s" class="val" style="color:#f44336"></span></div>
+            <div class="iv"><span class="dot" style="background:#ff9800"></span><span class="lbl">UT</span><span id="v-ut" class="val" style="color:#ff9800"></span></div>
+            <div class="iv"><span class="dot" style="background:#78909c"></span><span class="lbl">BB</span><span id="v-bb" class="val" style="color:#78909c"></span></div>
+        </div>
+    </div>
+
+    <div id="chart"></div>
+    <div id="bot-bar">
+        <div style="color:#787b86">Signals:</div>
+        <div id="signal-log"></div>
+        <div style="color:#787b86" id="refresh-info">Auto-refresh: 1s</div>
+    </div>
+    <div id="status"></div>
+    <div id="zoom-controls">
+        <button id="zoom-in" title="Zoom In">+</button>
+        <button id="zoom-out" title="Zoom Out">−</button>
+        <button id="zoom-reset" title="Reset View" style="font-size:14px">⟲</button>
+    </div>
+    <div id="loading">
+        <h1>🏆 Gold Chart — Coinbase Derivatives</h1>
+        <div class="sub" id="load-msg">⏳ Downloading Coinbase Gold data...</div>
+        <div class="hint">SSL Hybrid · EMA Cross · UT Bot · Bollinger Bands</div>
+    </div>
+
+<script>
+const chartEl = document.getElementById('chart');
+const HEADER_H = 42 + 30, FOOTER_H = 32;
+let chartH = window.innerHeight - HEADER_H - FOOTER_H;
+chartEl.style.height = chartH + 'px';
+
+const chart = LightweightCharts.createChart(chartEl, {
+    width: window.innerWidth, height: chartH,
+    layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
+    grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: '#2a2e39', scaleMargins: { top: 0.18, bottom: 0.18 } },
+    timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false },
+});
+window.addEventListener('resize', () => {
+    chartH = window.innerHeight - HEADER_H - FOOTER_H;
+    chartEl.style.height = chartH + 'px';
+    chart.resize(window.innerWidth, chartH);
+});
+
+// ══════════════════════════════════════════════════════════
+//  ALL INDICATOR LINES — visible by default (like TradingView)
+// ══════════════════════════════════════════════════════════
+
+// ── Bollinger Bands (grey cloud) ──
+const bbUpperLine = chart.addLineSeries({ color: 'rgba(120,144,156,0.35)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, title: '', priceLineVisible: false, lastValueVisible: false, visible: true });
+const bbLowerLine = chart.addLineSeries({ color: 'rgba(120,144,156,0.35)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, title: '', priceLineVisible: false, lastValueVisible: false, visible: true });
+const bbBasisLine = chart.addLineSeries({ color: 'rgba(120,144,156,0.55)', lineWidth: 1, title: '', priceLineVisible: false, lastValueVisible: false, visible: true });
+
+// ── SSL Baseline (thick aqua / fuchsia) ──
+const sslUpLine = chart.addLineSeries({ color: '#00bcd4', lineWidth: 2, title: '', priceLineVisible: false, lastValueVisible: false, visible: true });
+const sslDownLine = chart.addLineSeries({ color: '#e040fb', lineWidth: 2, title: '', priceLineVisible: false, lastValueVisible: false, visible: true });
+
+// ── SSL2 Channel (blue / purple) ──
+const ssl2UpLine = chart.addLineSeries({ color: '#2196f3', lineWidth: 1, title: '', priceLineVisible: false, lastValueVisible: false, visible: true });
+const ssl2DownLine = chart.addLineSeries({ color: '#9c27b0', lineWidth: 1, title: '', priceLineVisible: false, lastValueVisible: false, visible: true });
+
+// ── SSL3 Exit (lime / orange dashed) ──
+const ssl3UpLine = chart.addLineSeries({ color: '#76ff03', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: '', priceLineVisible: false, lastValueVisible: false, visible: true });
+const ssl3DownLine = chart.addLineSeries({ color: '#ff9800', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: '', priceLineVisible: false, lastValueVisible: false, visible: true });
+
+// ── EMA Crossover (green / red) ──
+const emaFastLine = chart.addLineSeries({ color: '#4caf50', lineWidth: 1, title: '', priceLineVisible: false, lastValueVisible: false, visible: true });
+const emaSlowLine = chart.addLineSeries({ color: '#f44336', lineWidth: 1, title: '', priceLineVisible: false, lastValueVisible: false, visible: true });
+
+// ── UT Bot trailing stop (orange thick dashed) ──
+const utLine = chart.addLineSeries({ color: '#ff9800', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, title: '', priceLineVisible: false, lastValueVisible: false, visible: true });
+
+// ── Candlestick (always visible, on top) ──
+const candleSeries = chart.addCandlestickSeries({
+    upColor: '#26a69a', downColor: '#ef5350',
+    borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+    wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+});
+
+const SERIES = {
+    ssl_up: sslUpLine, ssl_down: sslDownLine,
+    ssl2_up: ssl2UpLine, ssl2_down: ssl2DownLine,
+    ssl3_up: ssl3UpLine, ssl3_down: ssl3DownLine,
+    ema_fast: emaFastLine, ema_slow: emaSlowLine,
+    ut_stop: utLine,
+    bb_basis: bbBasisLine, bb_upper: bbUpperLine, bb_lower: bbLowerLine,
+};
+
+// ══════════════════════════════════════════════════════════
+//  TOGGLE GROUPS — map button data-group to line series
+// ══════════════════════════════════════════════════════════
+
+const GROUPS = {
+    ssl:  [sslUpLine, sslDownLine],
+    ssl2: [ssl2UpLine, ssl2DownLine],
+    ssl3: [ssl3UpLine, ssl3DownLine],
+    ema:  [emaFastLine, emaSlowLine],
+    ut:   [utLine],
+    bb:   [bbUpperLine, bbLowerLine, bbBasisLine],
+};
+
+const groupState = { ssl: true, ssl2: true, ssl3: true, ema: true, ut: true, bb: true };
+
+document.querySelectorAll('.toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const grp = btn.dataset.group;
+
+        if (grp === 'all') {
+            // If any group is on → turn all off.  If all off → turn all on.
+            const anyOn = Object.values(groupState).some(v => v);
+            const newState = !anyOn;
+            for (const g of Object.keys(groupState)) {
+                groupState[g] = newState;
+                GROUPS[g].forEach(s => s.applyOptions({ visible: newState }));
+            }
+            // Update all individual buttons
+            document.querySelectorAll('.toggle-btn[data-group]').forEach(b => {
+                if (b.dataset.group !== 'all') {
+                    b.classList.toggle('active', newState);
+                }
+            });
+            btn.classList.toggle('active', newState);
+            return;
+        }
+
+        // Toggle single group
+        const vis = !groupState[grp];
+        groupState[grp] = vis;
+        GROUPS[grp].forEach(s => s.applyOptions({ visible: vis }));
+        btn.classList.toggle('active', vis);
+
+        // Sync ALL button: active if every group is on
+        const allOn = Object.values(groupState).every(v => v);
+        const allBtn = document.querySelector('.toggle-btn[data-group="all"]');
+        if (allBtn) allBtn.classList.toggle('active', allOn);
+    });
+});
+
+// ── Crosshair move → update indicator values ──
+chart.subscribeCrosshairMove((param) => {
+    if (!param || !param.time) return;
+    for (const [key, series] of Object.entries(SERIES)) {
+        const val = param.seriesData.get(series);
+        if (val && val.value !== undefined) {
+            const v = val.value.toFixed(2);
+            updateIndVal(key, v);
+        }
+    }
+    const candle = param.seriesData.get(candleSeries);
+    if (candle) {
+        const el = document.getElementById('live-price');
+        el.textContent = '$' + candle.close.toFixed(2);
+        el.className = candle.close >= candle.open ? 'up' : 'down';
+    }
+});
+
+function updateIndVal(key, v) {
+    const map = {
+        ssl_up: 'v-ssl-up', ssl_down: null,
+        ssl2_up: null, ssl2_down: null,
+        ssl3_up: null, ssl3_down: null,
+        ema_fast: 'v-ema-f', ema_slow: 'v-ema-s',
+        ut_stop: 'v-ut',
+        bb_upper: 'v-bb', bb_basis: null, bb_lower: null,
+    };
+    const id = map[key];
+    if (id) document.getElementById(id).textContent = v;
+}
+
+// ─── WebSocket ───
+let ws;
+let isFirstLoad = true;
+function connect() {
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(wsProto + '//' + window.location.host);
+    ws.onopen = () => {
+        document.getElementById('connection').textContent = '🟢 Live';
+        document.getElementById('connection').style.color = '#26a69a';
+        document.getElementById('load-msg').textContent = '🟢 Connected — loading chart...';
+    };
+    ws.onclose = () => {
+        document.getElementById('connection').textContent = '🔴 Reconnecting...';
+        document.getElementById('connection').style.color = '#ef5350';
+        setTimeout(connect, 2000);
+    };
+    ws.onerror = () => ws.close();
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        const ov = document.getElementById('loading');
+        if (ov && ov.style.display !== 'none') ov.style.display = 'none';
+
+        if (msg.type === 'init') {
+            // Detect if user is viewing the LIVE edge (latest candles)
+            let wasAtLiveEdge = true;
+            let savedLogicalRange = null;
+            if (!isFirstLoad) {
+                try {
+                    const lr = chart.timeScale().getVisibleLogicalRange();
+                    const tr = chart.timeScale().getVisibleRange();
+                    if (lr && msg.candles && msg.candles.length) {
+                        const lastCandleTime = msg.candles[msg.candles.length - 1].time;
+                        // If the right edge of visible area is within 5 candles of the latest, user is at live edge
+                        wasAtLiveEdge = (tr && (lastCandleTime - tr.to) < 300); // 300s = 5 min candles
+                    }
+                    if (!wasAtLiveEdge) savedLogicalRange = lr;
+                } catch(e) {}
+            }
+
+            // Set candles
+            if (msg.candles && msg.candles.length) candleSeries.setData(msg.candles);
+            // Set all indicator lines
+            for (const [key, series] of Object.entries(SERIES)) {
+                if (msg[key] && msg[key].length) series.setData(msg[key]);
+            }
+            // Set markers
+            if (msg.markers && msg.markers.length) {
+                candleSeries.setMarkers(msg.markers);
+                const log = document.getElementById('signal-log');
+                log.innerHTML = '';
+                const last8 = msg.markers.slice(-8);
+                last8.forEach(m => {
+                    const e = document.createElement('div');
+                    const txt = m.text.replace('\n', ' ');
+                    let cls = 'open_long';
+                    if (txt.includes('open_short')) cls = 'open_short';
+                    else if (txt.includes('close_long')) cls = 'close_long';
+                    else if (txt.includes('close_short')) cls = 'close_short';
+                    e.className = 'sig-e ' + cls;
+                    e.textContent = txt;
+                    log.appendChild(e);
+                });
+            }
+            // Update info
+            if (msg.info) {
+                document.getElementById('candle-count').textContent = msg.info.candles || 0;
+                document.getElementById('signal-count').textContent = msg.info.signals || 0;
+                document.getElementById('timeframe').textContent = msg.info.interval || '1m';
+                if (msg.info.last_price) {
+                    const el = document.getElementById('live-price');
+                    const newPrice = msg.info.last_price;
+                    const oldPrice = parseFloat(el.textContent.replace('$','').replace(',','')) || 0;
+                    el.textContent = '$' + newPrice.toFixed(2);
+                    el.className = newPrice >= oldPrice ? 'up' : 'down';
+                }
+            }
+            // Update last indicator values in the compact display
+            if (msg.candles && msg.candles.length) {
+                for (const [key, series] of Object.entries(SERIES)) {
+                    if (msg[key] && msg[key].length) {
+                        const last = msg[key][msg[key].length - 1];
+                        if (last) updateIndVal(key, last.value.toFixed(2));
+                    }
+                }
+            }
+
+            // Scroll logic:
+            // - First load → show last 200 candles
+            // - Live edge → auto-scroll to follow latest candle (bars MOVE)
+            // - Viewing history → keep user's position locked
+            if (isFirstLoad && msg.candles && msg.candles.length > 200) {
+                const from = msg.candles[msg.candles.length - 200].time;
+                const to = msg.candles[msg.candles.length - 1].time;
+                chart.timeScale().setVisibleRange({ from, to });
+                isFirstLoad = false;
+                showStatus('Chart loaded — ' + (msg.info ? msg.info.candles : 0) + ' candles, ' + (msg.info ? msg.info.signals : 0) + ' signals');
+            } else if (isFirstLoad) {
+                isFirstLoad = false;
+            } else if (wasAtLiveEdge) {
+                // User is watching live — scroll to keep latest candle visible
+                chart.timeScale().scrollToRealTime();
+            } else if (savedLogicalRange) {
+                // User scrolled back in history — freeze their view
+                chart.timeScale().setVisibleLogicalRange(savedLogicalRange);
+            }
+        }
+    };
+}
+
+function showStatus(text) {
+    const el = document.getElementById('status');
+    el.textContent = text; el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+connect();
+
+// ── Zoom Controls ──
+document.getElementById('zoom-in').addEventListener('click', () => {
+    const ts = chart.timeScale();
+    const range = ts.getVisibleLogicalRange();
+    if (!range) return;
+    const bars = range.to - range.from;
+    const center = (range.from + range.to) / 2;
+    const newHalf = Math.max(bars * 0.35, 10);
+    ts.setVisibleLogicalRange({ from: center - newHalf, to: center + newHalf });
+});
+
+document.getElementById('zoom-out').addEventListener('click', () => {
+    const ts = chart.timeScale();
+    const range = ts.getVisibleLogicalRange();
+    if (!range) return;
+    const bars = range.to - range.from;
+    const center = (range.from + range.to) / 2;
+    const newHalf = bars * 0.65;
+    ts.setVisibleLogicalRange({ from: center - newHalf, to: center + newHalf });
+});
+
+document.getElementById('zoom-reset').addEventListener('click', () => {
+    chart.timeScale().fitContent();
+});
+</script>
+</body>
+</html>

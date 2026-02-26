@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan to Open Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #131722; color: #d1d4dc;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; padding: 20px;
+        }
+        h1 {
+            font-size: 22px; font-weight: 800; margin-bottom: 6px;
+            background: linear-gradient(135deg, #ffd700, #ff9800);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .sub { font-size: 13px; color: #787b86; margin-bottom: 24px; }
+        #qr-box {
+            background: #fff; border-radius: 16px; padding: 24px;
+            box-shadow: 0 4px 30px rgba(255,215,0,0.15);
+            display: flex; align-items: center; justify-content: center;
+        }
+        #qr-box img, #qr-box canvas { display: block; }
+        .url-box {
+            margin-top: 20px; background: #1e222d; border: 1px solid #2a2e39;
+            border-radius: 8px; padding: 10px 18px; font-family: 'Courier New', monospace;
+            font-size: 14px; color: #26a69a; word-break: break-all; text-align: center;
+            max-width: 420px;
+        }
+        .hint {
+            margin-top: 14px; font-size: 12px; color: #787b86; text-align: center;
+            line-height: 1.6;
+        }
+        .badge {
+            display: inline-block; margin-top: 16px; font-size: 11px;
+            background: #26a69a22; color: #26a69a; border: 1px solid #26a69a44;
+            padding: 4px 12px; border-radius: 10px; font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <h1>GOLD CHART — MOBILE ACCESS</h1>
+    <div class="sub">Scan QR code with your phone camera</div>
+    <div id="qr-box"></div>
+    <div class="url-box" id="url-display"></div>
+    <div class="hint">
+        Open your phone camera &rarr; point at QR code &rarr; tap the link<br>
+        Both devices must be on the same WiFi network
+    </div>
+    <span class="badge">Coinbase Gold Futures &middot; 1s refresh &middot; Live</span>
+
+    <script>
+        // Build chart URL using the current hostname (works for LAN IP, localhost, ngrok, or cloud)
+        const portPart = window.location.port ? ':' + window.location.port : '';
+        const chartUrl = window.location.protocol + '//' + window.location.hostname + portPart + '/chart.html';
+        document.getElementById('url-display').textContent = chartUrl;
+
+        // Generate QR code
+        const qr = qrcode(0, 'M');
+        qr.addData(chartUrl);
+        qr.make();
+
+        const size = 280;
+        const box = document.getElementById('qr-box');
+        const cellSize = Math.floor(size / qr.getModuleCount());
+        box.innerHTML = qr.createSvgTag({ cellSize: cellSize, margin: 0, scalable: true });
+        const svg = box.querySelector('svg');
+        if (svg) {
+            svg.setAttribute('width', size);
+            svg.setAttribute('height', size);
+        }
+    </script>
+</body>
+</html>

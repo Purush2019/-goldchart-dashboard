@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gold Trading Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0e17; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* ── Top Control Bar ── */
+        #control-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 20px; background: #131722; border-bottom: 1px solid #2a2e39;
+            height: 52px; flex-shrink: 0; z-index: 10;
+        }
+        #control-bar .brand {
+            display: flex; align-items: center; gap: 12px;
+        }
+        #control-bar .brand h1 {
+            font-size: 18px; font-weight: 800; color: #e0e3eb;
+            background: linear-gradient(135deg, #ffd700, #ff9800);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        #control-bar .brand .badge {
+            font-size: 10px; background: #26a69a22; color: #26a69a;
+            border: 1px solid #26a69a44; padding: 2px 8px; border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .server-controls {
+            display: flex; gap: 16px; align-items: center;
+        }
+        .srv-card {
+            display: flex; align-items: center; gap: 10px;
+            background: #1e222d; padding: 6px 14px; border-radius: 8px;
+            border: 1px solid #2a2e39;
+        }
+        .srv-card .dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: #ef5350; flex-shrink: 0;
+            box-shadow: 0 0 6px #ef535066;
+            transition: all 0.3s;
+        }
+        .srv-card .dot.alive {
+            background: #26a69a;
+            box-shadow: 0 0 8px #26a69a66;
+        }
+        .srv-card .name {
+            font-size: 12px; font-weight: 600; color: #787b86;
+            min-width: 80px;
+        }
+        .srv-card .name span { color: #d1d4dc; }
+        .srv-card .price {
+            font-family: 'Courier New', monospace; font-size: 14px;
+            font-weight: 800; min-width: 75px; text-align: right;
+        }
+        .srv-card .price.up { color: #26a69a; }
+        .srv-card .price.down { color: #ef5350; }
+        .srv-card .price.off { color: #787b86; }
+
+        .btn {
+            padding: 5px 12px; border-radius: 6px; border: none;
+            font-size: 11px; font-weight: 700; cursor: pointer;
+            transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .btn-restart {
+            background: #ff980022; color: #ff9800; border: 1px solid #ff980044;
+        }
+        .btn-restart:hover { background: #ff980044; }
+        .btn-restart:active { transform: scale(0.95); }
+        .btn-restart.spinning { opacity: 0.5; pointer-events: none; }
+
+        .btn-start {
+            background: #26a69a22; color: #26a69a; border: 1px solid #26a69a44;
+        }
+        .btn-start:hover { background: #26a69a44; }
+
+        /* ── Chart Frame ── */
+        #chart-area {
+            flex: 1; display: flex; overflow: hidden;
+        }
+        .chart-wrap {
+            flex: 1; position: relative; display: flex; flex-direction: column;
+        }
+        .chart-wrap .tab {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 4px 12px; background: #1a1e2a; border-bottom: 1px solid #2a2e39;
+            height: 28px; flex-shrink: 0;
+        }
+        .chart-wrap .tab .tag {
+            font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+            color: #ff9800;
+        }
+        .chart-wrap .tab .meta {
+            font-size: 10px; color: #787b86;
+        }
+        .chart-wrap iframe {
+            flex: 1; border: none; width: 100%; height: 100%;
+            background: #131722;
+        }
+        .chart-wrap .offline-overlay {
+            position: absolute; top: 28px; left: 0; right: 0; bottom: 0;
+            background: rgba(10,14,23,0.85); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 5;
+        }
+        .chart-wrap .offline-overlay.hidden { display: none; }
+        .offline-overlay .icon { font-size: 48px; margin-bottom: 12px; }
+        .offline-overlay .msg { font-size: 16px; color: #787b86; margin-bottom: 16px; }
+
+        /* ── Toast ── */
+        #toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #2196f3; color: white; padding: 10px 28px; border-radius: 8px;
+            font-size: 13px; font-weight: 600; z-index: 200;
+            box-shadow: 0 4px 20px rgba(33,150,243,0.4);
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+        }
+        #toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+<div id="control-bar">
+    <div class="brand">
+        <h1>GOLD TRADING DASHBOARD</h1>
+        <span class="badge" id="clock">--:--:--</span>
+    </div>
+
+    <div class="server-controls">
+        <div class="srv-card" id="yahoo-card">
+            <div class="dot" id="yahoo-dot"></div>
+            <div class="name"><span>COINBASE GOLD</span> :8080</div>
+            <div class="price off" id="yahoo-price">---</div>
+            <button class="btn btn-restart" id="btn-restart-yahoo" onclick="restartServer('yahoo')" title="Restart server">&#10227; Restart</button>
+        </div>
+    </div>
+</div>
+
+<div id="chart-area">
+    <div class="chart-wrap">
+        <div class="tab">
+            <span class="tag">&#128200; COINBASE DERIVATIVES &#183; GOL-27MAR26-CDE &#183; 1s refresh</span>
+            <span class="meta" id="yahoo-meta">--</span>
+        </div>
+        <iframe id="yahoo-frame" src="about:blank"></iframe>
+        <div class="offline-overlay" id="yahoo-overlay">
+            <div class="icon">&#128268;</div>
+            <div class="msg">Chart server is offline</div>
+            <button class="btn btn-start" onclick="restartServer('yahoo')">&#9654; Start Server</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const HOST = window.location.hostname;
+const CHART_URL = 'http://' + HOST + ':8080/chart.html';
+const DASHBOARD_API = 'http://' + HOST + ':8090/api';
+
+let chartAlive = false;
+
+// Clock
+function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+        now.toLocaleTimeString('en-US', { hour12: false }) + ' \u00b7 ' +
+        now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Toast
+function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// Health Check
+async function pollStatus() {
+    let alive = false;
+    try {
+        await fetch(CHART_URL, { mode: 'no-cors', cache: 'no-store' });
+        alive = true;
+    } catch (e) {}
+
+    const dot = document.getElementById('yahoo-dot');
+    const overlay = document.getElementById('yahoo-overlay');
+    const frame = document.getElementById('yahoo-frame');
+
+    if (alive && !chartAlive) {
+        dot.classList.add('alive');
+        overlay.classList.add('hidden');
+        frame.src = CHART_URL;
+        toast('\u2705 Chart server is online');
+    } else if (!alive && chartAlive) {
+        dot.classList.remove('alive');
+        overlay.classList.remove('hidden');
+        document.getElementById('yahoo-price').textContent = '---';
+        document.getElementById('yahoo-price').className = 'price off';
+        toast('\u274c Chart server went offline');
+    } else if (!alive) {
+        dot.classList.remove('alive');
+        overlay.classList.remove('hidden');
+    }
+    chartAlive = alive;
+}
+
+// Restart via Dashboard API
+async function restartServer(which) {
+    const btn = document.getElementById('btn-restart-yahoo');
+    if (btn) { btn.classList.add('spinning'); btn.textContent = '\u27f3 ...'; }
+
+    toast('\ud83d\udd04 Restarting server...');
+
+    try {
+        const r = await fetch(DASHBOARD_API + '/restart/' + which, { method: 'POST' });
+        const data = await r.json();
+        toast(data.message || '\u2705 Server restarted');
+    } catch (e) {
+        toast('\u26a0\ufe0f Dashboard API not reachable');
+    }
+
+    if (btn) {
+        setTimeout(() => { btn.classList.remove('spinning'); btn.textContent = '\u27f3 Restart'; }, 3000);
+    }
+
+    setTimeout(pollStatus, 4000);
+    setTimeout(pollStatus, 8000);
+    setTimeout(pollStatus, 12000);
+}
+
+// Listen for price updates from iframe
+window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'price_update') {
+        const price = e.data.price;
+        const el = document.getElementById('yahoo-price');
+        if (el && price) {
+            el.textContent = '$' + price.toFixed(2);
+            el.className = 'price up';
+        }
+        const meta = document.getElementById('yahoo-meta');
+        if (meta && e.data.candles) {
+            meta.textContent = e.data.candles + ' candles \u00b7 ' + e.data.signals + ' signals';
+        }
+    }
+});
+
+// Init
+pollStatus();
+setInterval(pollStatus, 5000);
+</script>
+</body>
+</html>

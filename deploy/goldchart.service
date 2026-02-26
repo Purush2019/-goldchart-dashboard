@@ -1,0 +1,27 @@
+[Unit]
+Description=Gold Chart - Coinbase Futures (Live)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=goldchart
+Group=goldchart
+WorkingDirectory=/opt/goldchart
+ExecStart=/opt/goldchart/venv/bin/python gold_chart.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+Environment=DASHBOARD_MODE=1
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=512M
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=goldchart
+
+[Install]
+WantedBy=multi-user.target

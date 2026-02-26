@@ -1,0 +1,40 @@
+
+# ═══════════════════════════════════════════════════════════
+#  GOLD CHART PROJECT — .gitignore
+# ═══════════════════════════════════════════════════════════
+
+# ── Python ──
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# ── Node / Playwright (legacy) ──
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+package-lock.json
+
+# ── Logs & temp files ──
+*.log
+dashboard_out.log
+dashboard_err.log
+price_result.txt
+
+# ── Screenshots & images ──
+tradingview_chart.png
+
+# ── IDE / Editor ──
+.vscode/
+*.code-workspace
+
+# ── OS files ──
+Thumbs.db
+Desktop.ini
+.DS_Store
