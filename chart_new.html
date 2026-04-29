@@ -366,6 +366,10 @@ function connect() {
                 chart.timeScale().setVisibleRange({ from, to });
                 isFirstLoad = false;
                 showStatus('Chart loaded — ' + (msg.info ? msg.info.candles : 0) + ' candles, ' + (msg.info ? msg.info.signals : 0) + ' signals');
+            } else if (isFirstLoad && msg.candles && msg.candles.length > 0) {
+                chart.timeScale().fitContent();
+                isFirstLoad = false;
+                showStatus('Chart loaded — ' + (msg.info ? msg.info.candles : 0) + ' candles, ' + (msg.info ? msg.info.signals : 0) + ' signals');
             } else if (isFirstLoad) {
                 isFirstLoad = false;
             } else if (wasAtLiveEdge) {

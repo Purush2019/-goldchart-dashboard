@@ -16,12 +16,19 @@ import numpy as np
 import math
 import json
 import os
+import sys
 import webbrowser
 import threading
 import time
 import http.server
+import re
 import urllib.request
 from datetime import datetime
+
+# Force UTF-8 output on Windows to avoid emoji encode errors
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 try:
     import websockets
@@ -32,13 +39,16 @@ except ImportError:
     import websockets
     import asyncio
 
-import ctypes
-import ctypes.wintypes
 import traceback
+IS_WINDOWS = os.name == "nt"
+
+if IS_WINDOWS:
+    import ctypes
+    import ctypes.wintypes
 
 
 # =============================================================================
-# KEEP-ALIVE
+# KEEP-ALIVE (Windows only — prevents sleep/screen-off)
 # =============================================================================
 
 ES_CONTINUOUS        = 0x80000000
@@ -60,6 +70,9 @@ def keep_alive_loop():
         time.sleep(30)
 
 def start_keep_alive():
+    if not IS_WINDOWS:
+        print("   🔋 Keep-alive skipped (not Windows)")
+        return None
     t = threading.Thread(target=keep_alive_loop, daemon=True)
     t.start()
     print("   🔋 Keep-alive active")
@@ -70,16 +83,15 @@ def start_keep_alive():
 # SETTINGS
 # =============================================================================
 
-# Coinbase Derivatives Gold Futures — auto-detected at startup
+# Coinbase API
 COINBASE_API = "https://api.coinbase.com/api/v3/brokerage/market"
-PRODUCT_ID = None          # Will be auto-detected (e.g. GOL-27MAR26-CDE)
 GRANULARITY = "ONE_MINUTE"
-REFRESH_SEC = 5            # Refresh every 5 seconds
+REFRESH_SEC = 5            # Refresh every 5 seconds (default)
+_refresh_sec = REFRESH_SEC  # Dynamic refresh interval (mutable)
 HISTORY_HOURS = 72         # How many hours of history to fetch (3 days)
 
-# Ports (different from Yahoo version so both can run simultaneously)
+# Port (HTTP + WebSocket on single port for easy tunnel/mobile access)
 HTTP_PORT = 8081
-WS_PORT = 8766
 
 # --- SSL Hybrid ---
 BASELINE_TYPE = "HMA"
@@ -101,53 +113,115 @@ UT_ATR_PERIOD = 10
 BB_PERIOD = 20
 BB_MULT = 2.0
 
+# --- Multi-Instrument Support ---
+INSTRUMENTS = {
+    "GOLD":    {"type": "future", "prefix": "GOL", "display": "Gold Futures",   "icon": "\U0001f947"},
+    "SILVER":  {"type": "future", "prefix": "SLR", "display": "Silver Futures", "icon": "\U0001f948"},
+    "OIL":     {"type": "future", "prefix": "NOL", "display": "Crude Oil",      "icon": "\U0001f6e2\ufe0f"},
+    "BTC-USD": {"type": "spot", "product_id": "BTC-USD", "display": "Bitcoin",  "icon": "\u20bf"},
+    "ETH-USD": {"type": "spot", "product_id": "ETH-USD", "display": "Ethereum", "icon": "\u039e"},
+    "SOL-USD": {"type": "spot", "product_id": "SOL-USD", "display": "Solana",   "icon": "\u25ce"},
+}
+DEFAULT_INSTRUMENT = "GOLD"
+
 
 # =============================================================================
-# COINBASE DATA FETCHER
+# COINBASE DATA FETCHER (multi-instrument)
 # =============================================================================
 
-def discover_gold_product():
-    """Find the active (front-month) gold futures contract on Coinbase."""
-    global PRODUCT_ID
+# Per-instrument state
+_product_ids = {}        # inst_key -> resolved Coinbase product_id
+_candle_caches = {}      # inst_key -> {timestamp -> candle dict}
+_cache_lock = threading.Lock()
+_discovery_times = {}    # inst_key -> epoch when contract was last discovered
+_REDISCOVER_INTERVAL = 3600  # re-check contracts every hour
+
+
+def _parse_contract_expiry(product_id):
+    """Parse the expiry date from a Coinbase futures product ID like NOL-27MAR26-CDE."""
+    m = re.search(r"-(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d{2})(?:-|$)", product_id)
+    if not m:
+        return None
+    day = int(m.group(1))
+    month = {
+        'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'MAY': 5, 'JUN': 6,
+        'JUL': 7, 'AUG': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DEC': 12,
+    }.get(m.group(2), 0)
+    year = 2000 + int(m.group(3))
+    try:
+        return datetime(year, month, day)
+    except ValueError:
+        return None
+
+
+def discover_product(inst_key):
+    """Discover/resolve the Coinbase product ID for an instrument."""
+    inst = INSTRUMENTS[inst_key]
+
+    if inst["type"] == "spot":
+        pid = inst["product_id"]
+        _product_ids[inst_key] = pid
+        try:
+            url = f"{COINBASE_API}/products/{pid}"
+            req = urllib.request.Request(url, headers={"Cache-Control": "no-cache"})
+            r = urllib.request.urlopen(req, timeout=10)
+            data = json.loads(r.read())
+            price = data.get("price", "?")
+            display = data.get("display_name", pid)
+            print(f"   ✓ Found {inst_key}: {pid} ({display}) @ ${price}")
+        except Exception as e:
+            print(f"   ✓ Registered {inst_key}: {pid} (price check skipped: {e})")
+        return pid
+
+    # Future products need auto-discovery
+    prefix = inst["prefix"]
     url = f"{COINBASE_API}/products?product_type=FUTURE"
     req = urllib.request.Request(url, headers={"Cache-Control": "no-cache"})
     r = urllib.request.urlopen(req, timeout=10)
     data = json.loads(r.read())
     products = data.get("products", [])
 
-    # Filter gold futures that are actively trading
-    gold = [p for p in products
-            if p.get("product_id", "").startswith("GOL")
-            and not p.get("trading_disabled", True)
-            and p.get("price", "")]
+    matches = [p for p in products
+               if p.get("product_id", "").startswith(prefix)
+               and not p.get("trading_disabled", True)
+               and p.get("price", "")]
 
-    if not gold:
-        # Fallback: any GOL product
-        gold = [p for p in products if p.get("product_id", "").startswith("GOL")]
+    if not matches:
+        matches = [p for p in products if p.get("product_id", "").startswith(prefix)]
 
-    if not gold:
-        raise RuntimeError("No Gold Futures found on Coinbase!")
+    if not matches:
+        raise RuntimeError(f"No {inst_key} futures found on Coinbase!")
 
-    # Pick the one with the nearest expiry (front-month)
-    gold.sort(key=lambda p: p.get("product_id", ""))
-    PRODUCT_ID = gold[0]["product_id"]
-    price = gold[0].get("price", "?")
-    display = gold[0].get("display_name", PRODUCT_ID)
-    print(f"   ✓ Found contract: {PRODUCT_ID} ({display}) @ ${price}")
-    return PRODUCT_ID
-
-
-# Persistent candle cache — avoids full re-download every refresh
-_candle_cache = {}   # timestamp -> candle dict
-_cache_lock = threading.Lock()
+    matches.sort(key=lambda p: (_parse_contract_expiry(p.get("product_id", "")) or datetime.max,
+                               p.get("product_id", "")))
+    pid = matches[0]["product_id"]
+    _product_ids[inst_key] = pid
+    price = matches[0].get("price", "?")
+    display = matches[0].get("display_name", pid)
+    print(f"   ✓ Found {inst_key}: {pid} ({display}) @ ${price}")
+    return pid
 
 
-def fetch_coinbase_candles_full():
-    """Full historical fetch (used on first load only)."""
-    if not PRODUCT_ID:
-        discover_gold_product()
+def _get_cache(inst_key):
+    """Get the candle cache for an instrument, creating if needed."""
+    if inst_key not in _candle_caches:
+        _candle_caches[inst_key] = {}
+    return _candle_caches[inst_key]
 
-    print(f"   📡 Full download: {PRODUCT_ID} ({GRANULARITY}, {HISTORY_HOURS}h)...")
+
+def _get_product_id(inst_key):
+    """Get/discover the product ID for an instrument."""
+    if inst_key not in _product_ids:
+        discover_product(inst_key)
+    return _product_ids[inst_key]
+
+
+def fetch_candles_full(inst_key):
+    """Full historical fetch for an instrument."""
+    pid = _get_product_id(inst_key)
+    cache = _get_cache(inst_key)
+
+    print(f"   \U0001f4e1 Full download: {pid} ({GRANULARITY}, {HISTORY_HOURS}h)...")
 
     end_ts = int(time.time())
     start_ts = end_ts - HISTORY_HOURS * 3600
@@ -161,7 +235,7 @@ def fetch_coinbase_candles_full():
         batch_end = cursor
         batch_start = max(cursor - batch_size, start_ts)
 
-        url = (f"{COINBASE_API}/products/{PRODUCT_ID}/candles"
+        url = (f"{COINBASE_API}/products/{pid}/candles"
                f"?start={batch_start}&end={batch_end}&granularity={GRANULARITY}")
 
         try:
@@ -170,7 +244,7 @@ def fetch_coinbase_candles_full():
             data = json.loads(r.read())
             candles = data.get("candles", [])
         except Exception as e:
-            print(f"   ⚠️  Batch fetch error: {e}")
+            print(f"   \u26a0\ufe0f  Batch fetch error: {e}")
             break
 
         if not candles:
@@ -183,40 +257,37 @@ def fetch_coinbase_candles_full():
         if requests_made < 30:
             time.sleep(0.15)
 
-    # Store in cache
     with _cache_lock:
         for c in all_candles:
-            _candle_cache[int(c["start"])] = c
+            cache[int(c["start"])] = c
 
-    print(f"   ✓ Full download: {len(_candle_cache)} candles ({requests_made} API calls)")
-    return _get_sorted_candles()
+    print(f"   ✓ Full download [{inst_key}]: {len(cache)} candles ({requests_made} API calls)")
+    return _get_sorted_candles(inst_key)
 
 
-def fetch_realtime_price():
-    """Fetch the real-time price from Coinbase (1 fast API call).
-    Prefers mid_market_price (bid/ask midpoint) which updates even when
-    no trades are happening.  Falls back to last-trade price."""
+def fetch_realtime_price(inst_key):
+    """Fetch the real-time price for an instrument."""
     try:
-        url = f"{COINBASE_API}/products/{PRODUCT_ID}"
+        pid = _get_product_id(inst_key)
+        url = f"{COINBASE_API}/products/{pid}"
         req = urllib.request.Request(url, headers={"Cache-Control": "no-cache"})
         r = urllib.request.urlopen(req, timeout=5)
         data = json.loads(r.read())
-        # mid_market_price updates with every bid/ask change (much more frequent)
         mid = data.get("mid_market_price") or data.get("price") or "0"
         return float(mid)
     except Exception:
         return None
 
 
-def fetch_coinbase_candles_incremental():
-    """Quick incremental fetch — last 10 min candles + real-time tick price."""
-    if not PRODUCT_ID:
-        discover_gold_product()
+def fetch_candles_incremental(inst_key):
+    """Quick incremental fetch for an instrument."""
+    pid = _get_product_id(inst_key)
+    cache = _get_cache(inst_key)
 
     end_ts = int(time.time())
     start_ts = end_ts - 600  # last 10 minutes
 
-    url = (f"{COINBASE_API}/products/{PRODUCT_ID}/candles"
+    url = (f"{COINBASE_API}/products/{pid}/candles"
            f"?start={start_ts}&end={end_ts}&granularity={GRANULARITY}")
 
     try:
@@ -225,66 +296,63 @@ def fetch_coinbase_candles_incremental():
         data = json.loads(r.read())
         candles = data.get("candles", [])
     except Exception as e:
-        print(f"   ⚠️  Incremental fetch error: {e}")
-        return _get_sorted_candles()
+        print(f"   \u26a0\ufe0f  Incremental fetch error ({inst_key}): {e}")
+        return _get_sorted_candles(inst_key)
 
-    # Also get real-time tick price
-    live_price = fetch_realtime_price()
+    live_price = fetch_realtime_price(inst_key)
 
     new_count = 0
     updated = 0
     with _cache_lock:
         for c in candles:
             ts = int(c["start"])
-            if ts not in _candle_cache:
+            if ts not in cache:
                 new_count += 1
             else:
                 updated += 1
-            _candle_cache[ts] = c
+            cache[ts] = c
 
-        # Inject real-time price into the latest candle
-        # This makes the chart show live price changes within the minute
-        if live_price and _candle_cache:
-            latest_ts = max(_candle_cache.keys())
-            latest = _candle_cache[latest_ts]
-            # If live_price is newer than the candle's close, update it
+        if live_price and cache:
+            latest_ts = max(cache.keys())
+            latest = cache[latest_ts]
             latest_copy = dict(latest)
             latest_copy["close"] = str(live_price)
             if live_price > float(latest_copy.get("high", 0)):
                 latest_copy["high"] = str(live_price)
             if live_price < float(latest_copy.get("low", 999999)):
                 latest_copy["low"] = str(live_price)
-            _candle_cache[latest_ts] = latest_copy
+            cache[latest_ts] = latest_copy
 
-        # Trim old candles beyond HISTORY_HOURS
         cutoff = end_ts - HISTORY_HOURS * 3600
-        old_keys = [k for k in _candle_cache if k < cutoff]
+        old_keys = [k for k in cache if k < cutoff]
         for k in old_keys:
-            del _candle_cache[k]
+            del cache[k]
 
     price_str = f" · live ${live_price:.2f}" if live_price else ""
     if new_count > 0:
-        print(f"   ✓ +{new_count} new, {updated} updated ({len(_candle_cache)} total){price_str}")
+        print(f"   ✓ [{inst_key}] +{new_count} new, {updated} updated ({len(cache)} total){price_str}")
     else:
-        print(f"   ✓ {updated} updated ({len(_candle_cache)} total){price_str}")
+        print(f"   ✓ [{inst_key}] {updated} updated ({len(cache)} total){price_str}")
 
-    return _get_sorted_candles()
+    return _get_sorted_candles(inst_key)
 
 
-def _get_sorted_candles():
-    """Return cache as a sorted list."""
+def _get_sorted_candles(inst_key):
+    """Return cache for an instrument as sorted list."""
+    cache = _get_cache(inst_key)
     with _cache_lock:
-        items = list(_candle_cache.values())
+        items = list(cache.values())
     items.sort(key=lambda c: int(c["start"]))
     return items
 
 
-def fetch_coinbase_candles():
+def fetch_candles(inst_key):
     """Smart fetch: full on first call, incremental after."""
-    if not _candle_cache:
-        return fetch_coinbase_candles_full()
+    cache = _get_cache(inst_key)
+    if not cache:
+        return fetch_candles_full(inst_key)
     else:
-        return fetch_coinbase_candles_incremental()
+        return fetch_candles_incremental(inst_key)
 
 
 # =============================================================================
@@ -559,8 +627,10 @@ def compute_all(opens, highs, lows, closes):
 # BUILD CHART MESSAGE
 # =============================================================================
 
-def build_chart_message(raw_candles):
+def build_chart_message(raw_candles, inst_key=None):
     """Build the full chart data message from Coinbase candle data."""
+    if inst_key is None:
+        inst_key = DEFAULT_INSTRUMENT
     n = len(raw_candles)
     if n == 0:
         return None
@@ -596,13 +666,13 @@ def build_chart_message(raw_candles):
         t = int(timestamps[i])
         a = m["action"]
         if a == "open_long":
-            chart_markers.append({"time": t, "position": "belowBar", "color": "#26a69a", "shape": "arrowUp", "text": m["label"]})
+            chart_markers.append({"time": t, "position": "belowBar", "color": "#10b981", "shape": "arrowUp", "text": m["label"]})
         elif a == "open_short":
-            chart_markers.append({"time": t, "position": "aboveBar", "color": "#ef5350", "shape": "arrowDown", "text": m["label"]})
+            chart_markers.append({"time": t, "position": "aboveBar", "color": "#ef4444", "shape": "arrowDown", "text": m["label"]})
         elif a == "close_long":
-            chart_markers.append({"time": t, "position": "aboveBar", "color": "#ff9800", "shape": "arrowDown", "text": m["label"]})
+            chart_markers.append({"time": t, "position": "aboveBar", "color": "#f59e0b", "shape": "arrowDown", "text": m["label"]})
         elif a == "close_short":
-            chart_markers.append({"time": t, "position": "belowBar", "color": "#2196f3", "shape": "arrowUp", "text": m["label"]})
+            chart_markers.append({"time": t, "position": "belowBar", "color": "#6366f1", "shape": "arrowUp", "text": m["label"]})
 
     return {
         "type": "init",
@@ -621,7 +691,9 @@ def build_chart_message(raw_candles):
         "bb_upper": make_line(indicators["bb_upper"]),
         "bb_lower": make_line(indicators["bb_lower"]),
         "info": {
-            "symbol": PRODUCT_ID or "COINBASE GOLD",
+            "symbol": _product_ids.get(inst_key, inst_key),
+            "display": INSTRUMENTS.get(inst_key, {}).get("display", inst_key),
+            "instrument": inst_key,
             "interval": "1m",
             "candles": len(candles),
             "signals": len(chart_markers),
@@ -634,66 +706,239 @@ def build_chart_message(raw_candles):
 # WEB SERVER
 # =============================================================================
 
-current_data = None
+# Per-instrument cached data + per-client instrument tracking
+_current_data = {}       # inst_key -> chart message
 ws_clients = set()
+_client_instruments = {} # websocket -> inst_key
 
 async def ws_handler(websocket):
     ws_clients.add(websocket)
+    _client_instruments[websocket] = DEFAULT_INSTRUMENT
     try:
-        if current_data:
-            await websocket.send(json.dumps(current_data))
+        # Send default instrument data on connect
+        inst = DEFAULT_INSTRUMENT
+        if inst in _current_data and _current_data[inst]:
+            await websocket.send(json.dumps(_current_data[inst]))
+        # Also send instrument list
+        inst_list = []
+        for key, info in INSTRUMENTS.items():
+            inst_list.append({"key": key, "display": info["display"], "icon": info.get("icon", ""), "type": info["type"]})
+        await websocket.send(json.dumps({"type": "instruments", "list": inst_list, "default": DEFAULT_INSTRUMENT}))
+
         async for msg in websocket:
+            try:
+                parsed = json.loads(msg)
+                if isinstance(parsed, dict) and "switch" in parsed:
+                    new_inst = parsed["switch"]
+                    if new_inst in INSTRUMENTS:
+                        _client_instruments[websocket] = new_inst
+                        if new_inst in _current_data and _current_data[new_inst]:
+                            await websocket.send(json.dumps(_current_data[new_inst]))
+                        else:
+                            await refresh_instrument(new_inst)
+                            if new_inst in _current_data and _current_data[new_inst]:
+                                await websocket.send(json.dumps(_current_data[new_inst]))
+                    continue
+                if "set_refresh" in parsed:
+                    val = parsed["set_refresh"]
+                    if isinstance(val, (int, float)) and 1 <= val <= 300:
+                        global _refresh_sec
+                        _refresh_sec = int(val)
+                        print(f"   ⏱️  Refresh interval changed to {_refresh_sec}s")
+                    continue
+            except (json.JSONDecodeError, TypeError):
+                pass
             if msg == "refresh":
-                await refresh_data()
-                if current_data:
-                    await websocket.send(json.dumps(current_data))
+                inst = _client_instruments.get(websocket, DEFAULT_INSTRUMENT)
+                await refresh_instrument(inst)
+                if inst in _current_data and _current_data[inst]:
+                    await websocket.send(json.dumps(_current_data[inst]))
     except websockets.exceptions.ConnectionClosed:
         pass
     finally:
         ws_clients.discard(websocket)
+        _client_instruments.pop(websocket, None)
 
-async def broadcast(msg):
+async def broadcast_instrument(inst_key, msg):
+    """Broadcast to all clients viewing a specific instrument."""
     global ws_clients
     if not ws_clients:
         return
     data = json.dumps(msg)
     dead = set()
     for ws in ws_clients:
-        try:
-            await ws.send(data)
-        except:
-            dead.add(ws)
+        if _client_instruments.get(ws) == inst_key:
+            try:
+                await ws.send(data)
+            except:
+                dead.add(ws)
     ws_clients -= dead
+    for ws in dead:
+        _client_instruments.pop(ws, None)
+
+def _maybe_rediscover(inst_key, candle_count=None):
+    """Re-discover contract if it's stale or returning too few candles."""
+    inst = INSTRUMENTS.get(inst_key)
+    if not inst or inst.get("type") == "spot":
+        return  # spot products don't need re-discovery
+
+    now = time.time()
+    last_disc = _discovery_times.get(inst_key, 0)
+    need_rediscover = False
+
+    if now - last_disc > _REDISCOVER_INTERVAL:
+        need_rediscover = True
+        print(f"   🔄 Periodic contract re-discovery for {inst_key}...")
+
+    if candle_count is not None and candle_count < 10:
+        need_rediscover = True
+        print(f"   ⚠️  Only {candle_count} candles for {inst_key} — contract may have expired")
+
+    if need_rediscover:
+        old_pid = _product_ids.get(inst_key)
+        try:
+            discover_product(inst_key)
+            _discovery_times[inst_key] = now
+            new_pid = _product_ids.get(inst_key)
+            if new_pid != old_pid:
+                print(f"   🔄 Contract changed for {inst_key}: {old_pid} → {new_pid} — resetting cache")
+                with _cache_lock:
+                    _candle_caches[inst_key] = {}
+        except Exception as e:
+            print(f"   ⚠️  Re-discovery failed for {inst_key}: {e}")
+
+
+async def refresh_instrument(inst_key):
+    """Refresh data for a specific instrument."""
+    try:
+        # Check if contract needs re-discovery before fetching
+        cur = _current_data.get(inst_key)
+        candle_count = cur['info']['candles'] if cur and 'info' in cur else None
+        await asyncio.to_thread(_maybe_rediscover, inst_key, candle_count)
+
+        raw = await asyncio.to_thread(fetch_candles, inst_key)
+        if raw:
+            msg = await asyncio.to_thread(build_chart_message, raw, inst_key)
+            if msg:
+                _current_data[inst_key] = msg
+                print(f"   ✓ [{inst_key}] {msg['info']['candles']} candles, "
+                      f"{msg['info']['signals']} signals, "
+                      f"last: ${msg['info']['last_price']:.2f}")
+                await broadcast_instrument(inst_key, msg)
+    except Exception as e:
+        print(f"   ❌ Refresh error ({inst_key}): {e}")
 
 async def refresh_data():
-    global current_data
-    try:
-        raw = await asyncio.to_thread(fetch_coinbase_candles)
-        if raw:
-            current_data = await asyncio.to_thread(build_chart_message, raw)
-            if current_data:
-                print(f"   ✓ Data refreshed: {current_data['info']['candles']} candles, "
-                      f"{current_data['info']['signals']} signals, "
-                      f"last price: ${current_data['info']['last_price']:.2f}")
-                await broadcast(current_data)
-    except Exception as e:
-        print(f"   ❌ Refresh error: {e}")
+    """Refresh all instruments that have active viewers."""
+    active = {DEFAULT_INSTRUMENT}
+    for ws, inst in _client_instruments.items():
+        active.add(inst)
+    for inst_key in active:
+        await refresh_instrument(inst_key)
 
 async def auto_refresh():
     while True:
-        await asyncio.sleep(REFRESH_SEC)
-        print(f"\n   🔄 Auto-refreshing data...")
-        await refresh_data()
+        await asyncio.sleep(_refresh_sec)
+        active = {DEFAULT_INSTRUMENT}
+        for ws, inst in _client_instruments.items():
+            active.add(inst)
+        for inst_key in active:
+            print(f"\n   🔄 Auto-refreshing {inst_key}...")
+            await refresh_instrument(inst_key)
 
-def start_http_server():
+
+def _serve_file(file_path, content_type="text/html"):
+    """Read a file and return websockets Response."""
+    from websockets.http11 import Response
+    from websockets.datastructures import Headers
+    try:
+        with open(file_path, "rb") as f:
+            body = f.read()
+        print(f"   [HTTP] Serving {os.path.basename(file_path)}: {len(body)} bytes, has rightOffset: {b'rightOffset' in body}")
+        return Response(200, "OK", Headers({
+            "Content-Type": content_type,
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }), body)
+    except FileNotFoundError:
+        return Response(404, "Not Found", Headers(), b"Not Found")
+
+
+async def process_request(connection, request):
+    """Handle HTTP requests on the same port as WebSocket.
+    Serves chart_coinbase.html for regular HTTP; returns None for WS upgrades.
+    """
+    from websockets.http11 import Response
+    from websockets.datastructures import Headers
+
+    # Let WebSocket upgrades through
+    upgrade_header = request.headers.get("Upgrade", "").lower()
+    if upgrade_header == "websocket":
+        return None
+
     chart_dir = os.path.dirname(os.path.abspath(__file__))
-    class QuietHandler(http.server.SimpleHTTPRequestHandler):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, directory=chart_dir, **kwargs)
-        def log_message(self, format, *args):
+    path = request.path.split('?')[0]
+
+    if path in ("/", "/chart_coinbase.html", "/chart.html", "/v2"):
+        return _serve_file(os.path.join(chart_dir, "chart_coinbase.html"), "text/html; charset=utf-8")
+    if path == "/qr" or path == "/qr.html":
+        return _serve_file(os.path.join(chart_dir, "qr.html"), "text/html; charset=utf-8")
+    if path == "/favicon.ico":
+        return Response(204, "No Content", Headers(), b"")
+    if path == "/ping":
+        import time as _t
+        body = json.dumps({"server": "local-coinbase", "pid": os.getpid(), "time": _t.time(), "product": _product_ids.get("GOLD", "?")}).encode()
+        return Response(200, "OK", Headers({"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"}), body)
+    if path == "/api/instruments":
+        inst_list = []
+        for key, info in INSTRUMENTS.items():
+            inst_list.append({"key": key, "display": info["display"], "icon": info.get("icon", ""), "type": info["type"]})
+        body = json.dumps(inst_list).encode()
+        return Response(200, "OK", Headers({
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+        }), body)
+    if path == "/api/signal":
+        # Return the latest signal from chart data (used by auto-trader for pre-order confirmation)
+        inst_key = DEFAULT_INSTRUMENT
+        signal_data = {"signal": None, "time": 0, "instrument": inst_key}
+        if inst_key in _current_data and _current_data[inst_key]:
+            markers = _current_data[inst_key].get("markers", [])
+            if markers:
+                last_marker = markers[-1]
+                # Extract signal action from marker text (e.g. "Buy\nopen_long" -> "open_long")
+                text = last_marker.get("text", "")
+                action = text.split("\n")[-1].strip() if text else ""
+                signal_data = {
+                    "signal": action,
+                    "time": last_marker.get("time", 0),
+                    "instrument": inst_key,
+                    "price": _current_data[inst_key].get("info", {}).get("last_price", 0),
+                }
+        body = json.dumps(signal_data).encode()
+        return Response(200, "OK", Headers({
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+        }), body)
+    if path == "/config.json":
+        import socket
+        local_ip = "127.0.0.1"
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
             pass
-    httpd = http.server.HTTPServer(("localhost", HTTP_PORT), QuietHandler)
-    httpd.serve_forever()
+        config = json.dumps({"port": HTTP_PORT, "local_ip": local_ip}).encode()
+        return Response(200, "OK", Headers({
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+        }), config)
+
+    return Response(404, "Not Found", Headers(), b"Not Found")
 
 
 # =============================================================================
@@ -715,7 +960,6 @@ def kill_port(port):
 
 def free_ports():
     kill_port(HTTP_PORT)
-    kill_port(WS_PORT)
     time.sleep(0.5)
 
 
@@ -724,16 +968,16 @@ def free_ports():
 # =============================================================================
 
 async def main():
-    global ws_clients, current_data
+    global ws_clients, _current_data
     ws_clients = set()
-    current_data = None
+    _current_data = {}
 
+    inst_names = ", ".join(INSTRUMENTS[k]["display"] for k in INSTRUMENTS)
     print(f"""
     ╔═══════════════════════════════════════════════════════════╗
-    ║       GOLD CHART — COINBASE Edition                       ║
+    ║   MULTI-INSTRUMENT CHART — COINBASE Edition              ║
     ║                                                           ║
-    ║  Real Gold Futures from COINBASE Derivatives              ║
-    ║  Same contract as TradingView (GOLJ2026)                 ║
+    ║  Instruments: {inst_names:<43s} ║
     ║  All Pine Script indicators computed in Python:           ║
     ║    • SSL Hybrid (HMA 60 / EMA 5 / HMA 15 exit)          ║
     ║    • EMA Crossover (9 / 21)                              ║
@@ -741,25 +985,37 @@ async def main():
     ║    • Bollinger Bands (20, 2.0)                           ║
     ║                                                           ║
     ║  NO API key needed — public endpoints only               ║
-    ║  Ports: HTTP {HTTP_PORT} / WS {WS_PORT} (Yahoo uses 8080/8765)       ║
+    ║  Port: {HTTP_PORT} (HTTP + WebSocket combined)                    ║
     ╚═══════════════════════════════════════════════════════════╝
     """)
 
     start_keep_alive()
 
-    # 1. Discover contract
-    print("── Step 1: Finding Gold Futures contract ──")
-    discover_gold_product()
+    # 1. Discover default instrument
+    print(f"── Step 1: Discovering {DEFAULT_INSTRUMENT} contract ──")
+    discover_product(DEFAULT_INSTRUMENT)
+    _discovery_times[DEFAULT_INSTRUMENT] = time.time()
 
-    # 2. Start servers
-    print("\n── Step 2: Starting servers ──")
-    threading.Thread(target=start_http_server, daemon=True).start()
-    print(f"   ✓ HTTP server on http://localhost:{HTTP_PORT}/chart_coinbase.html")
-    ws_server = await websockets.serve(ws_handler, "localhost", WS_PORT)
-    print(f"   ✓ WebSocket server on ws://localhost:{WS_PORT}")
+    # 2. Start combined HTTP+WS server on single port
+    print("\n── Step 2: Starting server (HTTP + WebSocket on single port) ──")
+    ws_server = await websockets.serve(
+        ws_handler, "0.0.0.0", HTTP_PORT,
+        process_request=process_request,
+        max_size=10 * 1024 * 1024,
+    )
+    import socket as _sock
+    try:
+        _s = _sock.socket(_sock.AF_INET, _sock.SOCK_DGRAM)
+        _s.connect(("8.8.8.8", 80))
+        _local_ip = _s.getsockname()[0]
+        _s.close()
+    except Exception:
+        _local_ip = "127.0.0.1"
+    print(f"   ✓ Server on http://0.0.0.0:{HTTP_PORT}/chart_coinbase.html")
+    print(f"   📱 Mobile (same WiFi): http://{_local_ip}:{HTTP_PORT}/chart_coinbase.html")
 
-    # 3. Load data
-    print(f"\n── Step 3: Loading {HISTORY_HOURS}h of Coinbase Gold data ──")
+    # 3. Load data for default instrument
+    print(f"\n── Step 3: Loading {HISTORY_HOURS}h of {DEFAULT_INSTRUMENT} data ──")
     await refresh_data()
 
     # 4. Open browser
@@ -797,10 +1053,11 @@ def run_with_watchdog():
 
         except KeyboardInterrupt:
             print("\n⏹  Stopped by user (Ctrl+C). Goodbye!")
-            try:
-                ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
-            except Exception:
-                pass
+            if IS_WINDOWS:
+                try:
+                    ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
+                except Exception:
+                    pass
             break
 
         except Exception as e:

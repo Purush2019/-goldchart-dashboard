@@ -25,6 +25,7 @@ import webbrowser
 import threading
 import time
 import http.server
+import re
 import urllib.request
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -459,6 +460,23 @@ def compute_all(opens, highs, lows, closes):
 # COINBASE DATA FETCHER
 # =============================================================================
 
+def _parse_contract_expiry(product_id):
+    """Parse the expiry date from a Coinbase futures product ID like GOL-27MAR26-CDE."""
+    m = re.search(r"-(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d{2})(?:-|$)", product_id)
+    if not m:
+        return None
+    day = int(m.group(1))
+    month = {
+        'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'MAY': 5, 'JUN': 6,
+        'JUL': 7, 'AUG': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DEC': 12,
+    }.get(m.group(2), 0)
+    year = 2000 + int(m.group(3))
+    try:
+        return datetime(year, month, day)
+    except ValueError:
+        return None
+
+
 def discover_gold_product():
     """Find the active (front-month) gold futures contract on Coinbase."""
     global PRODUCT_ID
@@ -479,7 +497,8 @@ def discover_gold_product():
     if not gold:
         raise RuntimeError("No Gold Futures found on Coinbase!")
 
-    gold.sort(key=lambda p: p.get("product_id", ""))
+    gold.sort(key=lambda p: (_parse_contract_expiry(p.get("product_id", "")) or datetime.max,
+                             p.get("product_id", "")))
     PRODUCT_ID = gold[0]["product_id"]
     price = gold[0].get("price", "?")
     display = gold[0].get("display_name", PRODUCT_ID)
@@ -490,6 +509,8 @@ def discover_gold_product():
 # Persistent candle cache — avoids full re-download every refresh
 _candle_cache = {}   # timestamp -> candle dict
 _cache_lock = threading.Lock()
+_last_discovery_time = 0   # epoch when contract was last discovered
+_REDISCOVER_INTERVAL = 3600  # re-check contract every hour
 
 
 def fetch_coinbase_candles_full():
@@ -768,10 +789,43 @@ async def broadcast(msg):
     ws_clients -= dead
 
 
+def _maybe_rediscover_contract(candle_count=None):
+    """Re-discover the active gold contract if it's stale or returning too few candles."""
+    global _last_discovery_time, PRODUCT_ID, _candle_cache
+    now = time.time()
+    need_rediscover = False
+
+    # Periodic re-discovery (every hour)
+    if now - _last_discovery_time > _REDISCOVER_INTERVAL:
+        need_rediscover = True
+        print("   🔄 Periodic contract re-discovery...")
+
+    # Emergency re-discovery: too few candles means contract likely expired
+    if candle_count is not None and candle_count < 10:
+        need_rediscover = True
+        print(f"   ⚠️  Only {candle_count} candles — contract may have expired, re-discovering...")
+
+    if need_rediscover:
+        old_product = PRODUCT_ID
+        try:
+            discover_gold_product()
+            _last_discovery_time = now
+            if PRODUCT_ID != old_product:
+                print(f"   🔄 Contract changed: {old_product} → {PRODUCT_ID} — resetting cache")
+                with _cache_lock:
+                    _candle_cache.clear()
+        except Exception as e:
+            print(f"   ⚠️  Re-discovery failed: {e}")
+
+
 async def refresh_data():
     """Fetch new data, compute indicators, update global state."""
     global current_data
     try:
+        # Check if contract needs re-discovery before fetching
+        candle_count = current_data['info']['candles'] if current_data and 'info' in current_data else None
+        await asyncio.to_thread(_maybe_rediscover_contract, candle_count)
+
         raw = await asyncio.to_thread(fetch_coinbase_candles)
         if raw:
             current_data = await asyncio.to_thread(build_chart_message, raw)
@@ -917,8 +971,10 @@ async def main():
     start_keep_alive()
 
     # 1. Discover contract
+    global _last_discovery_time
     print("── Step 1: Finding Gold Futures contract ──")
     discover_gold_product()
+    _last_discovery_time = time.time()
 
     # 2. Start combined HTTP+WS server on single port
     print("\n── Step 2: Starting server (HTTP + WebSocket on single port) ──")
