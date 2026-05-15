@@ -38,3 +38,14 @@ tradingview_chart.png
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# ── Plus500 browser profile (persistent session) ──
+.plus500_profile/
+
+# Cloudflare tunnel credentials
+.cloudflared/
+*.pem
+*tunnel*.json
+
+# Local Netlify folder
+.netlify
