@@ -261,6 +261,14 @@ def watchdog_loop():
 
 # ─── HTTP Server (Dashboard + API) ──────────────────────────
 
+def public_url_alive(url, timeout=5):
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "goldchart-dashboard-health/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return 200 <= response.status < 400
+    except Exception:
+        return False
+
 def deploy_to_gcp():
     """Deploy local files to GCP VM via SCP+SSH. Returns (success, steps)."""
     steps = []
@@ -392,11 +400,13 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     "port": SERVERS[name]["port"],
                     "label": SERVERS[name]["label"],
                 }
+            tunnel_status_alive = public_url_alive("https://goldchart.win/chart_coinbase.html") if SKIP_TUNNELS else tunnel_alive()
             status["tunnel"] = {
-                "alive": tunnel_alive(),
+                "alive": tunnel_status_alive,
                 "domain": TUNNEL_DOMAIN,
-                "url": _public_url,
+                "url": "https://goldchart.win" if SKIP_TUNNELS else _public_url,
                 "label": f"Cloudflare Tunnel ({TUNNEL_DOMAIN})",
+                "managed_by": "watchdog" if SKIP_TUNNELS else "dashboard",
             }
             self._json_response(status)
             return
