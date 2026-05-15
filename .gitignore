@@ -47,6 +47,8 @@ Desktop.ini
 *.pem
 *tunnel*.json
 cloudflared-vm-private.zip
+!cloudflared-vm-private.zip.enc
+cloudflared-vm-password.txt
 
 # Local Netlify folder
 .netlify

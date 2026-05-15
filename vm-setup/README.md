@@ -95,6 +95,23 @@ Test-Path "$env:USERPROFILE\.cloudflared\config.yml"
 Test-Path "$env:USERPROFILE\.cloudflared\f3893509-af50-4f84-a0ce-9aa4102d7a2f.json"
 ```
 
+If direct copy is not possible, use the encrypted Git package instead. On the laptop:
+
+```powershell
+.\vm-setup\protect_cloudflared_for_git.ps1 -Password "choose-a-strong-password"
+git add cloudflared-vm-private.zip.enc vm-setup\restore_cloudflared_from_git.ps1
+git commit -m "Add encrypted Cloudflare VM package"
+git push
+```
+
+On the VM after `git pull`:
+
+```powershell
+.\vm-setup\restore_cloudflared_from_git.ps1 -Password "same-strong-password"
+```
+
+Never commit the raw `.cloudflared` folder or raw `cloudflared-vm-private.zip`.
+
 ## Run Setup
 
 Open PowerShell as Administrator on the VM:
