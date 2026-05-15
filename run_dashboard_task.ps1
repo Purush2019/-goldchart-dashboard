@@ -1,8 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-Set-Location "C:\Users\purus\OneDrive\Documents\Playwright"
-$env:PYTHONIOENCODING = "utf-8"
-$env:PYTHONUTF8 = "1"
-$env:DASHBOARD_SKIP_TUNNELS = "1"
+$root = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+Set-Location $root
 
-.\.venv\Scripts\python.exe -u dashboard.py *> dashboard_task.log
+.\run_goldchart_permanent.ps1

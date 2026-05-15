@@ -13,11 +13,13 @@ Use a Windows Server cloud VM when the dashboard, Chrome, and trading automation
 
 ## Files To Copy To The VM
 
-Copy this project to:
+Clone or copy this project anywhere on the VM, for example:
 
 ```text
 C:\GoldChart\Playwright
 ```
+
+The setup script now detects the project folder automatically from its own location.
 
 Also copy your Cloudflare tunnel credentials folder from the laptop:
 
@@ -58,6 +60,40 @@ Option B: set environment variables for the VM user:
 ```
 
 Then sign out/sign in or restart the dashboard task so the variables are loaded.
+
+## Missing `.venv\Scripts\python.exe`
+
+Do not copy `.venv` from the laptop and do not commit it to GitHub. On the VM, run:
+
+```powershell
+cd C:\path\to\-goldchart-dashboard\vm-setup
+.\setup_goldchart_windows_vm.ps1
+```
+
+The setup script creates `.venv`, installs dependencies, and installs Playwright Chromium.
+
+If you only want to start the app without the full setup script, run this from the project root:
+
+```powershell
+.\run_goldchart_permanent.ps1
+```
+
+That launcher also creates `.venv` if it is missing.
+
+## Missing `.cloudflared\config.yml`
+
+This file is intentionally not in GitHub. Copy the folder directly from the laptop to the VM user profile:
+
+```powershell
+robocopy "$env:USERPROFILE\.cloudflared" "C:\Users\<vm-user>\.cloudflared" /E
+```
+
+Replace `<vm-user>` with the Windows username on the VM. After copying, verify:
+
+```powershell
+Test-Path "$env:USERPROFILE\.cloudflared\config.yml"
+Test-Path "$env:USERPROFILE\.cloudflared\f3893509-af50-4f84-a0ce-9aa4102d7a2f.json"
+```
 
 ## Run Setup
 

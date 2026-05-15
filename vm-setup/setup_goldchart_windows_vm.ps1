@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$ProjectSource = "C:\GoldChart\Playwright"
+$ProjectSource = Split-Path -Parent $PSScriptRoot
 $CloudflaredDir = "C:\Program Files\cloudflared"
 $CloudflaredExe = Join-Path $CloudflaredDir "cloudflared.exe"
 $CloudflaredUserDir = Join-Path $env:USERPROFILE ".cloudflared"
