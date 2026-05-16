@@ -164,8 +164,20 @@ function Start-GoldChartDashboard {
     }
 }
 
+$loopCount = 0
+Write-MonitorLog "GoldChart watchdog started from $root"
+
 while ($true) {
-    Start-GoldChartDashboard
-    Start-GoldChartTunnel
+    try {
+        Start-GoldChartDashboard
+        Start-GoldChartTunnel
+        $loopCount += 1
+        if (($loopCount % 20) -eq 0) {
+            Write-MonitorLog "Watchdog heartbeat"
+        }
+    } catch {
+        Write-MonitorLog "Watchdog loop error: $($_.Exception.Message)"
+    }
+
     Start-Sleep -Seconds 30
 }
