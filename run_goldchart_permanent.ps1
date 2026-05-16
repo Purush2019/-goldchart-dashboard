@@ -165,7 +165,7 @@ function Start-GoldChartDashboard {
 }
 
 while ($true) {
-    Start-GoldChartTunnel
     Start-GoldChartDashboard
+    Start-GoldChartTunnel
     Start-Sleep -Seconds 30
 }
