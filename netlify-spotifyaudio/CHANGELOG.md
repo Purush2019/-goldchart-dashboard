@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.21 - 2026-07-17
+
+- Replaced the active song dot with a thin subtle light stroke.
+- Adjusted the animation path so the light reaches the rectangle corners.
+- Reduced visibility of the active border effect for a more professional look.
+
 ## 1.0.20 - 2026-07-17
 
 - Reduced the active song outside-border light to a smaller dot.
