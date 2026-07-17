@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.22 - 2026-07-17
+
+- Increased brightness of the selected song's thin moving light stroke.
+- Kept the same subtle stroke size and border path.
+
 ## 1.0.21 - 2026-07-17
 
 - Replaced the active song dot with a thin subtle light stroke.
