@@ -1,5 +1,5 @@
-const APP_VERSION = "1.0.2";
-const CACHE = `spotifyaudio-v${APP_VERSION}`;
+const APP_VERSION = "1.0.3";
+const CACHE = `pulseplay-v${APP_VERSION}`;
 const APP_SHELL = ["./", "./index.html", "./manifest.json", "./icon.svg", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("message", event => {

@@ -1,8 +1,15 @@
 # Changelog
 
+## 1.0.3 - 2026-07-17
+
+- Rebranded the app from Spotify Audio to PulsePlay with a custom logo.
+- Reduced oversized icon typography and removed emoji-heavy tab/button labels.
+- Replaced the search emoji with a small CSS-drawn search mark.
+- Updated the app manifest and service worker version for the new brand release.
+
 ## 1.0.2 - 2026-07-17
 
-- Refreshed the UI with a more modern Spotify-style mobile app feel.
+- Refreshed the UI with a more modern music app feel.
 - Added a richer top bar, rounded navigation pills, softer filters, and polished song rows.
 - Improved the mini-player styling with a floating glassy bottom bar.
 - Kept the release version tied to the service worker cache for reliable updates.

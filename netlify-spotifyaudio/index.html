@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Spotify Audio</title>
+<title>PulsePlay</title>
 
 <!-- PWA -->
 <link rel="manifest" href="./manifest.json">
@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#1DB954">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Music">
+<meta name="apple-mobile-web-app-title" content="PulsePlay">
 <link rel="apple-touch-icon" href="./icon-180.png">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -62,7 +62,9 @@ a{color:inherit;text-decoration:none}
 .search-wrap{position:relative}
 .search-wrap input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);padding:14px 14px 14px 44px;border-radius:12px;font-size:1rem;outline:none;transition:border .2s}
 .search-wrap input:focus{border-color:var(--accent);background:var(--card2)}
-.search-wrap .s-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:1.1rem;color:var(--text2)}
+.search-wrap .s-icon{position:absolute;left:17px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--text2);font-size:0;text-indent:-999px;overflow:hidden}
+.search-wrap .s-icon::before{content:"";position:absolute;inset:1px;border:2px solid currentColor;border-radius:50%}
+.search-wrap .s-icon::after{content:"";position:absolute;width:7px;height:2px;right:-1px;bottom:1px;background:currentColor;border-radius:2px;transform:rotate(45deg);transform-origin:center}
 .search-wrap input{padding-right:48px}
 .mic-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;background:transparent;border:1px solid transparent;color:var(--text2);cursor:pointer;padding:0;border-radius:50%;transition:all .2s;display:flex;align-items:center;justify-content:center}
 .mic-btn svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
@@ -118,7 +120,7 @@ a{color:inherit;text-decoration:none}
 .loading,.empty{text-align:center;padding:40px 20px;color:var(--text2)}
 .loading .spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.empty .icon{font-size:3rem;margin-bottom:12px}
+.empty .icon{font-size:1.35rem;margin-bottom:10px}
 
 /* Lang pills */
 .lang-pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
@@ -152,7 +154,7 @@ a{color:inherit;text-decoration:none}
 .god-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;margin-bottom:20px}
 .god-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 8px;text-align:center;cursor:pointer;transition:all .2s}
 .god-card:hover,.god-card.active{background:var(--accent);border-color:var(--accent);color:#000;transform:translateY(-2px);box-shadow:0 4px 16px rgba(29,185,84,.25)}
-.god-card .g-icon{font-size:2rem;margin-bottom:6px}
+.god-card .g-icon{font-size:1.15rem;margin-bottom:8px}
 .god-card .g-name{font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .god-card.active .g-name{color:#fff}
 
@@ -267,7 +269,7 @@ body{
   border-color:transparent;
   box-shadow:0 0 0 3px rgba(29,185,84,.35),0 14px 34px rgba(0,0,0,.32);
 }
-.search-wrap .s-icon{color:#111;font-size:1rem}
+.search-wrap .s-icon{color:#111}
 .mic-btn{right:10px;background:#111;color:#fff;border-color:transparent}
 .mic-btn:hover,.mic-btn.listening{background:var(--accent);color:#050505}
 .tabs{
@@ -423,11 +425,23 @@ body{
   border-color:var(--border);
   border-radius:16px;
 }
+.god-card .g-icon{
+  width:34px;
+  height:34px;
+  margin:0 auto 8px;
+  border-radius:12px;
+  background:rgba(255,255,255,.08);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  line-height:1;
+}
 .god-card:hover,.god-card.active{
   background:#fff;
   color:#050505;
   border-color:#fff;
 }
+.god-card:hover .g-icon,.god-card.active .g-icon{background:rgba(0,0,0,.08)}
 .now-playing{
   left:12px;
   right:12px;
@@ -503,14 +517,14 @@ body{
 <input id="song-video-file" type="file" accept="video/mp4,video/webm,video/*" hidden>
 <div class="header">
   <div class="header-copy">
-    <div class="eyebrow">Good vibes</div>
-    <div class="logo"><img src="./icon.svg" alt="Spotify logo"><span>Spotify Audio</span></div>
+    <div class="eyebrow">Music, refreshed</div>
+    <div class="logo"><img src="./icon.svg" alt="PulsePlay logo"><span>PulsePlay</span></div>
   </div>
   <div class="header-badge">Live</div>
 </div>
 <div class="search-section">
   <div class="search-wrap">
-    <span class="s-icon">🔍</span>
+    <span class="s-icon" aria-hidden="true"></span>
     <input type="text" id="search-input" placeholder="Search songs, albums, artists..." autocomplete="off">
     <button class="mic-btn" id="mic-btn" onclick="toggleMic()" aria-label="Voice search">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/><path d="M8 22h8"/></svg>
@@ -519,12 +533,12 @@ body{
 </div>
 
 <div class="tabs">
-  <div class="tab active" data-tab="home" onclick="showTab('home')">🏠 Home</div>
-  <div class="tab" data-tab="party" onclick="showTab('party')">🎉 Party</div>
-  <div class="tab" data-tab="devotional" onclick="showTab('devotional')">🙏 Devotional</div>
-  <div class="tab" data-tab="kids" onclick="showTab('kids')">👶 Kids</div>
-  <div class="tab" data-tab="search" onclick="showTab('search')">🔍 Results</div>
-  <div class="tab" data-tab="queue" onclick="showTab('queue')">📋 Queue <span class="queue-count" id="queue-count">0</span></div>
+  <div class="tab active" data-tab="home" onclick="showTab('home')">Home</div>
+  <div class="tab" data-tab="party" onclick="showTab('party')">Party</div>
+  <div class="tab" data-tab="devotional" onclick="showTab('devotional')">Devotional</div>
+  <div class="tab" data-tab="kids" onclick="showTab('kids')">Kids</div>
+  <div class="tab" data-tab="search" onclick="showTab('search')">Results</div>
+  <div class="tab" data-tab="queue" onclick="showTab('queue')">Queue <span class="queue-count" id="queue-count">0</span></div>
 </div>
 
 <div class="content">
@@ -611,7 +625,7 @@ body{
 <script>
 const SAAVN_API='https://saavnapi-nine.vercel.app/result/';
 const FALLBACK_API='/.netlify/functions/jiosaavn';
-const APP_VERSION='1.0.2';
+const APP_VERSION='1.0.3';
 let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false;
 let partyAllSongs=[],currentPartyLang='hindi',partyUsedQueries=new Set(),isPartyLoading=false,partyInitialized=false;
 let currentDevLang='hindi',currentKidsLang='english',currentDevId='ganesha',currentKidsId='rhymes';
@@ -634,7 +648,7 @@ let audioMuteBeforeVideo=false;
 let latestYouTubeTime=0;
 let youtubeListenTimer=null;
 const VIDEO_BACKGROUNDS={
-  // Add real MP4/WebM links here for songs that should behave like Spotify Canvas.
+  // Add real MP4/WebM links here for songs that should use a looping video background.
   // Use song id, exact song name, or "song name - artist" as the key.
   // Example: "my song - my artist": "./videos/my-song.mp4"
 };
@@ -645,7 +659,7 @@ function updateMediaSession(song){
   navigator.mediaSession.metadata=new MediaMetadata({
     title:song.name||'Unknown',
     artist:song.artist||'',
-    album:'Spotify Audio',
+    album:'PulsePlay',
     artwork
   });
   navigator.mediaSession.playbackState=audio.paused?'paused':'playing';
@@ -711,7 +725,7 @@ const CURATED_YEAR_QUERIES={
       'Youth Tamil movie songs 2026',
       'Karuppu Tamil movie songs 2026',
       'Meesaya Murukku 2 songs 2026',
-      'Tamil Songs 2026 New Tamil Hits 2026 Spotify'
+      'Tamil Songs 2026 New Tamil Hits 2026'
     ]
   }
 };
@@ -1044,15 +1058,15 @@ function renderHomeFiltered(){
   }else{
     html+='<div class="empty"><div class="icon">🔎</div><div class="msg">No songs match these filters yet<br><span style="font-size:.75rem">Click below to fetch more</span></div></div>';
   }
-  let label='🔍 Load more songs';
-  if(year&&artist&&singer)label=`🔍 Load more ${artist} ${singer} ${year} songs`;
-  else if(year&&singer)label=`🔍 Load more ${singer} ${year} songs`;
-  else if(artist&&singer)label=`🔍 Load more ${artist} ${singer} songs`;
-  else if(year&&artist)label=`🔍 Load more ${artist} ${year} songs`;
-  else if(year)label=`🔍 Load more ${currentLang} ${year} songs`;
-  else if(artist)label=`🔍 Load more ${artist} songs`;
-  else if(singer)label=`🔍 Load more ${singer} songs`;
-  else label=`🔍 Load more ${currentLang} songs`;
+  let label='Load more songs';
+  if(year&&artist&&singer)label=`Load more ${artist} ${singer} ${year} songs`;
+  else if(year&&singer)label=`Load more ${singer} ${year} songs`;
+  else if(artist&&singer)label=`Load more ${artist} ${singer} songs`;
+  else if(year&&artist)label=`Load more ${artist} ${year} songs`;
+  else if(year)label=`Load more ${currentLang} ${year} songs`;
+  else if(artist)label=`Load more ${artist} songs`;
+  else if(singer)label=`Load more ${singer} songs`;
+  else label=`Load more ${currentLang} songs`;
   html+=`<div class="load-more-wrap"><button id="load-more-btn" class="load-more-btn" onclick="loadMoreSongs()">${esc(label)}</button></div>`;
   c.innerHTML=html;
 }
@@ -1235,7 +1249,7 @@ function renderSearchResults(){
   uniqueSongs(searchSongs).forEach(s=>h+=songItemHtml(s));
   h+=searchSongs.length?'</ul>':'';
   if(searchSongs.length)h+=`<div style="text-align:center;color:var(--text2);font-size:.75rem;margin:4px 0 6px">Showing ${uniqueSongs(searchSongs).length} unique results</div>`;
-  h+=`<div class="load-more-wrap"><button id="search-load-more-btn" class="load-more-btn" onclick="loadMoreSearchResults()">🔍 Load more results</button></div>`;
+  h+=`<div class="load-more-wrap"><button id="search-load-more-btn" class="load-more-btn" onclick="loadMoreSearchResults()">Load more results</button></div>`;
   c.innerHTML=h||'<div class="empty">No results found</div>';
 }
 async function doSearch(q){
@@ -1810,17 +1824,17 @@ function renderPartyFiltered(){
     html+='<ul class="song-list">';filtered.forEach(s=>html+=songItemHtml(s));html+='</ul>';
     html+=`<div style="text-align:center;color:var(--text2);font-size:.75rem;margin:4px 0 6px">Showing ${filtered.length} of ${partyAllSongs.length} loaded</div>`;
   }else{
-    html+='<div class="empty"><div class="icon">🎉</div><div class="msg">No party songs match these filters yet<br><span style="font-size:.75rem">Click below to fetch more</span></div></div>';
+    html+='<div class="empty"><div class="msg">No party songs match these filters yet<br><span style="font-size:.75rem">Click below to fetch more</span></div></div>';
   }
-  let label='🎉 Load more party songs';
-  if(year&&artist&&singer)label=`🎉 Load more ${artist} ${singer} ${year} party songs`;
-  else if(year&&singer)label=`🎉 Load more ${singer} ${year} party songs`;
-  else if(artist&&singer)label=`🎉 Load more ${artist} ${singer} party songs`;
-  else if(year&&artist)label=`🎉 Load more ${artist} ${year} party songs`;
-  else if(year)label=`🎉 Load more ${currentPartyLang} ${year} party songs`;
-  else if(artist)label=`🎉 Load more ${artist} party songs`;
-  else if(singer)label=`🎉 Load more ${singer} party songs`;
-  else label=`🎉 Load more ${currentPartyLang} party songs`;
+  let label='Load more party songs';
+  if(year&&artist&&singer)label=`Load more ${artist} ${singer} ${year} party songs`;
+  else if(year&&singer)label=`Load more ${singer} ${year} party songs`;
+  else if(artist&&singer)label=`Load more ${artist} ${singer} party songs`;
+  else if(year&&artist)label=`Load more ${artist} ${year} party songs`;
+  else if(year)label=`Load more ${currentPartyLang} ${year} party songs`;
+  else if(artist)label=`Load more ${artist} party songs`;
+  else if(singer)label=`Load more ${singer} party songs`;
+  else label=`Load more ${currentPartyLang} party songs`;
   html+=`<div class="load-more-wrap"><button id="party-load-more-btn" class="load-more-btn" onclick="loadMorePartySongs()">${esc(label)}</button></div>`;
   c.innerHTML=html;
 }
@@ -1978,11 +1992,11 @@ function categoryQueryVariants(item,lang,type){
 function devLanguageChanged(value){currentDevLang=value;loadDevSection(currentDevId)}
 function kidsLanguageChanged(value){currentKidsLang=value;loadKidsSection(currentKidsId)}
 async function loadDevotional(){const c=document.getElementById('devotional-content');c.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading devotional songs...</div>';let html=`<div class="filter-row"><label>Language</label><select id="dev-lang-select" onchange="devLanguageChanged(this.value)">${languageOptionsHtml(currentDevLang)}</select></div><div class="god-grid">`;for(const d of DEV_CATEGORIES){html+=`<div class="god-card" onclick="loadDevSection('${esc(d.id)}')"><div class="g-icon">${d.icon}</div><div class="g-name">${esc(d.name)}</div></div>`;}html+='</div><div id="dev-inner"></div>';c.innerHTML=html;await loadDevSection(currentDevId||DEV_CATEGORIES[0].id);}
-function renderDevSection(){const d=DEV_CATEGORIES.find(x=>x.id===currentDevId);const inner=document.getElementById('dev-inner');if(!d||!inner)return;const songs=uniqueSongs(devSongs);let h=songs.length?`<div class="sec-title">🙏 ${esc(d.name)}</div><ul class="song-list">`:'';songs.forEach(s=>h+=songItemHtml(s));h+=songs.length?'</ul>':'<div class="empty">No devotional songs found</div>';h+=`<div class="load-more-wrap"><button id="dev-load-more-btn" class="load-more-btn" onclick="loadMoreDevSongs()">🙏 Load more ${esc(d.name)} songs</button></div>`;inner.innerHTML=h}
+function renderDevSection(){const d=DEV_CATEGORIES.find(x=>x.id===currentDevId);const inner=document.getElementById('dev-inner');if(!d||!inner)return;const songs=uniqueSongs(devSongs);let h=songs.length?`<div class="sec-title">${esc(d.name)}</div><ul class="song-list">`:'';songs.forEach(s=>h+=songItemHtml(s));h+=songs.length?'</ul>':'<div class="empty">No devotional songs found</div>';h+=`<div class="load-more-wrap"><button id="dev-load-more-btn" class="load-more-btn" onclick="loadMoreDevSongs()">Load more ${esc(d.name)} songs</button></div>`;inner.innerHTML=h}
 async function loadDevSection(id){const d=DEV_CATEGORIES.find(x=>x.id===id);if(!d)return;currentDevId=id;devSongs=[];devUsedQueries=new Set();document.querySelectorAll('#tab-devotional .god-card').forEach(el=>el.classList.remove('active'));const cards=[...document.querySelectorAll('#tab-devotional .god-card')];const idx=DEV_CATEGORIES.findIndex(x=>x.id===id);if(cards[idx])cards[idx].classList.add('active');const inner=document.getElementById('dev-inner');inner.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading songs...</div>';await loadMoreDevSongs(true);}
 async function loadMoreDevSongs(initial=false){if(isDevLoading)return;const d=DEV_CATEGORIES.find(x=>x.id===currentDevId);if(!d)return;isDevLoading=true;const btn=document.getElementById('dev-load-more-btn');const orig=btn?.textContent||'';if(btn){btn.disabled=true;btn.textContent='Loading more...';}const all=categoryQueryVariants(d,currentDevLang,'devotional');let unused=all.filter(q=>!devUsedQueries.has(q));if(!unused.length){devUsedQueries=new Set();unused=all;}const before=devSongs.length;let attempts=0;while(devSongs.length<before+(initial?8:10)&&unused.length&&attempts<(initial?1:4)){const batch=unused.slice(0,initial?4:5);batch.forEach(q=>devUsedQueries.add(q));const fresh=await multiQuery(batch);devSongs=mergeSongs(devSongs,fresh);unused=all.filter(q=>!devUsedQueries.has(q));attempts++;}renderDevSection();if(btn){btn.disabled=false;btn.textContent=orig;}const added=devSongs.length-before;if(!initial)showToast(added?`Added ${added} devotional songs`:'No more devotional songs found');isDevLoading=false;}
 async function loadKids(){const c=document.getElementById('kids-content');c.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading kids songs...</div>';let html=`<div class="filter-row"><label>Language</label><select id="kids-lang-select" onchange="kidsLanguageChanged(this.value)">${languageOptionsHtml(currentKidsLang)}</select></div><div class="god-grid">`;for(const k of KIDS_CATEGORIES){html+=`<div class="god-card" onclick="loadKidsSection('${esc(k.id)}')"><div class="g-icon">${k.icon}</div><div class="g-name">${esc(k.name)}</div></div>`;}html+='</div><div id="kids-inner"></div>';c.innerHTML=html;await loadKidsSection(currentKidsId||KIDS_CATEGORIES[0].id);}
-function renderKidsSection(){const k=KIDS_CATEGORIES.find(x=>x.id===currentKidsId);const inner=document.getElementById('kids-inner');if(!k||!inner)return;const songs=uniqueSongs(kidsSongs);let h=songs.length?`<div class="sec-title">👶 ${esc(k.name)}</div><ul class="song-list">`:'';songs.forEach(s=>h+=songItemHtml(s));h+=songs.length?'</ul>':'<div class="empty">No kids songs found</div>';h+=`<div class="load-more-wrap"><button id="kids-load-more-btn" class="load-more-btn" onclick="loadMoreKidsSongs()">👶 Load more ${esc(k.name)} songs</button></div>`;inner.innerHTML=h}
+function renderKidsSection(){const k=KIDS_CATEGORIES.find(x=>x.id===currentKidsId);const inner=document.getElementById('kids-inner');if(!k||!inner)return;const songs=uniqueSongs(kidsSongs);let h=songs.length?`<div class="sec-title">${esc(k.name)}</div><ul class="song-list">`:'';songs.forEach(s=>h+=songItemHtml(s));h+=songs.length?'</ul>':'<div class="empty">No kids songs found</div>';h+=`<div class="load-more-wrap"><button id="kids-load-more-btn" class="load-more-btn" onclick="loadMoreKidsSongs()">Load more ${esc(k.name)} songs</button></div>`;inner.innerHTML=h}
 async function loadKidsSection(id){const k=KIDS_CATEGORIES.find(x=>x.id===id);if(!k)return;currentKidsId=id;kidsSongs=[];kidsUsedQueries=new Set();document.querySelectorAll('#tab-kids .god-card').forEach(el=>el.classList.remove('active'));const cards=[...document.querySelectorAll('#tab-kids .god-card')];const idx=KIDS_CATEGORIES.findIndex(x=>x.id===id);if(cards[idx])cards[idx].classList.add('active');const inner=document.getElementById('kids-inner');inner.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading songs...</div>';await loadMoreKidsSongs(true);}
 async function loadMoreKidsSongs(initial=false){if(isKidsLoading)return;const k=KIDS_CATEGORIES.find(x=>x.id===currentKidsId);if(!k)return;isKidsLoading=true;const btn=document.getElementById('kids-load-more-btn');const orig=btn?.textContent||'';if(btn){btn.disabled=true;btn.textContent='Loading more...';}const all=categoryQueryVariants(k,currentKidsLang,'kids');let unused=all.filter(q=>!kidsUsedQueries.has(q));if(!unused.length){kidsUsedQueries=new Set();unused=all;}const before=kidsSongs.length;let attempts=0;while(kidsSongs.length<before+(initial?8:10)&&unused.length&&attempts<(initial?1:4)){const batch=unused.slice(0,initial?4:5);batch.forEach(q=>kidsUsedQueries.add(q));const fresh=await multiQuery(batch);kidsSongs=mergeSongs(kidsSongs,fresh);unused=all.filter(q=>!kidsUsedQueries.has(q));attempts++;}renderKidsSection();if(btn){btn.disabled=false;btn.textContent=orig;}const added=kidsSongs.length-before;if(!initial)showToast(added?`Added ${added} kids songs`:'No more kids songs found');isKidsLoading=false;}
 const _showTab=showTab;showTab=function(tab){_showTab(tab);if(tab==='party')loadParty();if(tab==='devotional')loadDevotional();if(tab==='kids')loadKids();}

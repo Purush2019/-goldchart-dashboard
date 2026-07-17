@@ -1,6 +1,6 @@
 {
-  "name": "SpotifyAudio",
-  "short_name": "SpotifyAudio",
+  "name": "PulsePlay",
+  "short_name": "PulsePlay",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#121212",
