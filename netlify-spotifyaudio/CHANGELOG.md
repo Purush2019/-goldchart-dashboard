@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.29 - 2026-07-17
+
+- Added a direct JioSaavn playlist/album fallback when public song API mirrors return empty results.
+- Normalized fallback songs into the existing player format with playable media URLs.
+- Restored section loading reliability when upstream search providers return empty arrays.
+
 ## 1.0.28 - 2026-07-17
 
 - Fixed the Home Year filter so `All` no longer filters every song out.
