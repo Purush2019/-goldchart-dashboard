@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.23 - 2026-07-17
+
+- Made the Home song search box more compact.
+- Reduced search input height, padding, radius, shadow, AI badge, and mic button size.
+
 ## 1.0.22 - 2026-07-17
 
 - Increased brightness of the selected song's thin moving light stroke.
