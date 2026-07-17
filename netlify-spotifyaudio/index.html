@@ -420,13 +420,13 @@ body{
 .song-item::after{
   content:"";
   position:absolute;
-  width:22px;
-  height:4px;
+  width:7px;
+  height:7px;
   left:14px;
-  top:-3px;
+  top:-4px;
   border-radius:999px;
-  background:linear-gradient(90deg,rgba(215,255,228,0),#d7ffe4,var(--accent2),rgba(29,185,84,0));
-  box-shadow:0 0 8px rgba(215,255,228,.82),0 0 16px rgba(29,185,84,.42);
+  background:#d7ffe4;
+  box-shadow:0 0 6px rgba(215,255,228,.74),0 0 10px rgba(29,185,84,.36);
   opacity:0;
   pointer-events:none;
 }
@@ -439,7 +439,7 @@ body{
 }
 .song-item.playing::after{
   opacity:1;
-  animation:activeSongOuterTrace 11s linear infinite;
+  animation:activeSongOuterTrace 15s linear infinite;
 }
 .song-item.playing .s-art,.song-item.playing .s-info,.song-item.playing .s-actions,.song-item.playing .song-has-video{
   position:relative;
@@ -447,14 +447,11 @@ body{
 }
 .song-item.playing .s-title{color:#fff}
 @keyframes activeSongOuterTrace{
-  0%{left:14px;top:-3px;width:22px;height:4px;transform:rotate(0deg)}
-  24%{left:calc(100% - 36px);top:-3px;width:22px;height:4px;transform:rotate(0deg)}
-  28%{left:calc(100% - 3px);top:14px;width:4px;height:22px;transform:rotate(0deg)}
-  48%{left:calc(100% - 3px);top:calc(100% - 36px);width:4px;height:22px;transform:rotate(0deg)}
-  52%{left:calc(100% - 36px);top:calc(100% - 3px);width:22px;height:4px;transform:rotate(0deg)}
-  76%{left:14px;top:calc(100% - 3px);width:22px;height:4px;transform:rotate(0deg)}
-  80%{left:-3px;top:calc(100% - 36px);width:4px;height:22px;transform:rotate(0deg)}
-  100%{left:-3px;top:14px;width:4px;height:22px;transform:rotate(0deg)}
+  0%{left:14px;top:-4px}
+  25%{left:calc(100% - 21px);top:-4px}
+  50%{left:calc(100% - 21px);top:calc(100% - 3px)}
+  75%{left:14px;top:calc(100% - 3px)}
+  100%{left:14px;top:-4px}
 }
 .song-item .s-art{
   width:52px;
@@ -730,7 +727,7 @@ body{
 <script>
 const SAAVN_API='https://saavnapi-nine.vercel.app/result/';
 const FALLBACK_API='/.netlify/functions/jiosaavn';
-const APP_VERSION='1.0.19';
+const APP_VERSION='1.0.20';
 let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false,trendingMixInitialized=false,aiSearchIntent=null;
 let partyAllSongs=[],currentPartyLang='hindi',partyUsedQueries=new Set(),isPartyLoading=false,partyInitialized=false;
 let currentDevLang='hindi',currentKidsLang='english',currentDevId='ganesha',currentKidsId='rhymes';

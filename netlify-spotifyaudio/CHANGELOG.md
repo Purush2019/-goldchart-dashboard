@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.20 - 2026-07-17
+
+- Reduced the active song outside-border light to a smaller dot.
+- Smoothed the border route by removing segment resizing at corners.
+- Slowed the loop to 15 seconds.
+
 ## 1.0.19 - 2026-07-17
 
 - Moved the active song light animation outside/on top of the song row border.
