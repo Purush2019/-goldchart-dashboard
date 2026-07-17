@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2 - 2026-07-17
+
+- Refreshed the UI with a more modern Spotify-style mobile app feel.
+- Added a richer top bar, rounded navigation pills, softer filters, and polished song rows.
+- Improved the mini-player styling with a floating glassy bottom bar.
+- Kept the release version tied to the service worker cache for reliable updates.
+
 ## 1.0.1 - 2026-07-17
 
 - Updated Home trending searches to favor current, viral, and today-based queries.
