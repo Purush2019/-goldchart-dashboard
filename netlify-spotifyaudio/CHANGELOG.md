@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.16 - 2026-07-17
+
+- Changed the active song animation to a slow rainbow line that travels around the rectangle border.
+- Removed the rotating inside-the-box rainbow effect.
+
 ## 1.0.15 - 2026-07-17
 
 - Replaced the dim green active-song glow with a rotating rainbow rectangle border.
