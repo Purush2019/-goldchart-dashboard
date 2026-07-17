@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.5 - 2026-07-17
+
+- Integrated the bottom player into the app shell instead of showing it as a separate floating card.
+- Matched the bottom player surface, border, and spacing to the rest of the PulsePlay UI.
+- Preserved the full mobile control set including previous, rewind, play, fast forward, next, and Video.
+
 ## 1.0.4 - 2026-07-17
 
 - Reduced UI font sizes and weights for a more professional app feel.
