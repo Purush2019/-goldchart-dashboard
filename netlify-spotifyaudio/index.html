@@ -732,9 +732,8 @@ body{
 <div class="toast-box" id="toast-box"></div>
 
 <script>
-const SAAVN_API='https://saavnapi-nine.vercel.app/result/';
 const FALLBACK_API='/.netlify/functions/jiosaavn';
-const APP_VERSION='1.0.30';
+const APP_VERSION='1.0.31';
 let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false,trendingMixInitialized=false,aiSearchIntent=null;
 const homeLanguageMemory=new Map(),homeLanguagePrefetching=new Set();
 let partyAllSongs=[],currentPartyLang='hindi',partyUsedQueries=new Set(),isPartyLoading=false,partyInitialized=false;
@@ -935,23 +934,12 @@ function yearOptions(){
   return years;
 }
 async function apiQuery(query){
-  const fallback=async()=>{
+  try{
     const r=await fetch(`${FALLBACK_API}?query=${encodeURIComponent(query)}`);
     const j=await r.json();
     if(Array.isArray(j))return j;
     return j?.data?.results||[];
-  };
-  try{
-    const r=await fetch(`${SAAVN_API}?query=${encodeURIComponent(query)}&lyrics=false&songdata=true`);
-    if(!r.ok)throw new Error('http_'+r.status);
-    const j=await r.json();
-    const list=Array.isArray(j)?j:[];
-    return list.length?list:await fallback();
-  }catch(e){
-    try{
-      return await fallback();
-    }catch(e2){console.warn('apiQuery failed',e2);return[];}
-  }
+  }catch(e){console.warn('apiQuery failed',e);return[];}
 }
 async function multiQuery(queries){
   const uniqueQueries=[...new Set((queries||[]).map(q=>String(q||'').trim()).filter(Boolean))];

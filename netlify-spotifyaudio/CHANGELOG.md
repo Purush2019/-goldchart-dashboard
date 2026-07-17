@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.31 - 2026-07-17
+
+- Removed public mirror song providers from the browser and Netlify function path.
+- Made song loading use only the direct JioSaavn API fallback and tagged returned songs with `source: "jiosaavn"`.
+
 ## 1.0.30 - 2026-07-17
 
 - Fixed the browser song search path so empty mirror API responses now fall through to the working Netlify fallback.
