@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.9 - 2026-07-17
+
+- Added a compact animated PulsePlay visualizer to the top-right header area.
+- Kept the former Live badge removed while giving the header a more polished active state.
+
 ## 1.0.8 - 2026-07-17
 
 - Removed the top-right Live badge from the header.
