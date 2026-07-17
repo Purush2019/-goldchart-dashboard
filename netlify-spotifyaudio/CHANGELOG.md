@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.32 - 2026-07-17
+
+- Scoped Home and Party actor/singer dropdowns to the selected language.
+- Added JioSaavn language metadata to song results.
+- Cleared stale actor/singer selections when switching language filters.
+
 ## 1.0.31 - 2026-07-17
 
 - Removed public mirror song providers from the browser and Netlify function path.

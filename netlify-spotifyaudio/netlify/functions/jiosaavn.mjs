@@ -41,6 +41,7 @@ async function normalizeJioSong(song) {
     title: song.title,
     name: song.title,
     album: song.more_info?.album || "",
+    language: song.language || song.more_info?.language || "",
     year: song.year || song.more_info?.release_date?.slice?.(0, 4) || "",
     release_date: song.more_info?.release_date || "",
     primary_artists: primaryArtists,
