@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.8 - 2026-07-17
+
+- Removed the top-right Live badge from the header.
+- Renamed the Results tab to Trending.
+- Added a mixed Trending feed for Hollywood, Bollywood, album, dance, party, and viral songs.
+- Kept search input behavior while showing search results inside the Trending tab.
+
 ## 1.0.7 - 2026-07-17
 
 - Applied latest-relevance sorting to Party, Devotional, and Kids feeds.
