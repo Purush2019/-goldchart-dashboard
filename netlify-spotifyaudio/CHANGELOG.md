@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.28 - 2026-07-17
+
+- Fixed the Home Year filter so `All` no longer filters every song out.
+- Added defensive filter normalization for Home and Party dropdowns.
+- Made first-load song fetching more resilient across Home, Party, Devotional, and Kids before showing an empty state.
+
 ## 1.0.27 - 2026-07-17
 
 - Limited concurrent song API searches to reduce throttling and partial results.
