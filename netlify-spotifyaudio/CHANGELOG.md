@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.6 - 2026-07-17
+
+- Changed Home song ordering to prioritize latest, trending, viral, and current-year results.
+- Removed alphabetical title sorting from Home language feeds such as Tamil.
+- Preserved API/query result order as the fallback so new songs stay near the top.
+
 ## 1.0.5 - 2026-07-17
 
 - Integrated the bottom player into the app shell instead of showing it as a separate floating card.

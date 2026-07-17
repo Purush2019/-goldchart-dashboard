@@ -640,7 +640,7 @@ body{
 <script>
 const SAAVN_API='https://saavnapi-nine.vercel.app/result/';
 const FALLBACK_API='/.netlify/functions/jiosaavn';
-const APP_VERSION='1.0.5';
+const APP_VERSION='1.0.6';
 let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false;
 let partyAllSongs=[],currentPartyLang='hindi',partyUsedQueries=new Set(),isPartyLoading=false,partyInitialized=false;
 let currentDevLang='hindi',currentKidsLang='english',currentDevId='ganesha',currentKidsId='rhymes';
@@ -1050,16 +1050,37 @@ function getHomeFilters(){
     singer:document.getElementById('home-singer-select').value.trim()
   };
 }
+function homeSongLatestScore(song,indexMap){
+  const n=normalizeSong(song);
+  const currentYear=new Date().getFullYear();
+  const year=Number(n.year||song._queryYear||0);
+  const query=String(song._query||'').toLowerCase();
+  let score=0;
+  if(year)score+=year*100;
+  if(year===currentYear)score+=700;
+  else if(year===currentYear-1)score+=250;
+  if(/\b(today|trending|viral|latest|new|current|fresh)\b/.test(query))score+=400;
+  if(query.includes(monthName().toLowerCase()))score+=180;
+  if(/\b(top|hits)\b/.test(query))score+=80;
+  const id=String(song.id||song.songid||song.media_url||song.previewUrl||'');
+  return score*10000-(indexMap.get(id)??0);
+}
 function getFilteredHomeSongs(year,artist,singer=''){
   let filtered=uniqueSongs(homeAllSongs);
   if(year)filtered=filtered.filter(s=>normalizeSong(s).year===year);
   if(artist)filtered=filtered.filter(s=>artistMatchesSong(s,artist));
   if(singer)filtered=filtered.filter(s=>singerMatchesSong(s,singer));
+  const indexMap=new Map();
+  homeAllSongs.forEach((song,index)=>{
+    const id=String(song.id||song.songid||song.media_url||song.previewUrl||'');
+    if(id&&!indexMap.has(id))indexMap.set(id,index);
+  });
   return filtered.slice().sort((a,b)=>{
-    const ay=Number(normalizeSong(a).year||0);
-    const by=Number(normalizeSong(b).year||0);
-    if(by!==ay)return by-ay;
-    return String(normalizeSong(a).name).localeCompare(String(normalizeSong(b).name));
+    const diff=homeSongLatestScore(b,indexMap)-homeSongLatestScore(a,indexMap);
+    if(diff)return diff;
+    const aid=String(a.id||a.songid||a.media_url||a.previewUrl||'');
+    const bid=String(b.id||b.songid||b.media_url||b.previewUrl||'');
+    return (indexMap.get(aid)??0)-(indexMap.get(bid)??0);
   });
 }
 function renderHomeFiltered(){
