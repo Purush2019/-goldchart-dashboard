@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.18 - 2026-07-17
+
+- Reworked the active song border animation into a slower continuous green gradient layer.
+- Removed the corner-by-corner border tracer that could look fast or briefly stuck.
+
 ## 1.0.17 - 2026-07-17
 
 - Slowed the active song border tracer for smoother movement.
