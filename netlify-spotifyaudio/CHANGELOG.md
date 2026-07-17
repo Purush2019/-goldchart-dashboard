@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.25 - 2026-07-17
+
+- Fixed the Trending tab so it always clears old search state and reloads the mixed trending feed.
+- Added a fallback query batch and retry button when the first trending request returns no songs.
+
 ## 1.0.24 - 2026-07-17
 
 - Improved Home language switching between Hindi, Tamil, Telugu, and other language tabs.
