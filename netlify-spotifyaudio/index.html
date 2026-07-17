@@ -734,7 +734,7 @@ body{
 <script>
 const SAAVN_API='https://saavnapi-nine.vercel.app/result/';
 const FALLBACK_API='/.netlify/functions/jiosaavn';
-const APP_VERSION='1.0.25';
+const APP_VERSION='1.0.26';
 let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false,trendingMixInitialized=false,aiSearchIntent=null;
 const homeLanguageMemory=new Map(),homeLanguagePrefetching=new Set();
 let partyAllSongs=[],currentPartyLang='hindi',partyUsedQueries=new Set(),isPartyLoading=false,partyInitialized=false;
@@ -1476,7 +1476,30 @@ function aiRankSongs(songs,intent){
 }
 function trendingMixQueries(){
   const y=new Date().getFullYear();
-  return rotateQueries([
+  const hollywoodParty=[
+    `Pitbull party songs`,
+    `DJ Snake party songs`,
+    `David Guetta party songs`,
+    `Calvin Harris dance hits`,
+    `Flo Rida party songs`,
+    `LMFAO party songs`,
+    `The Black Eyed Peas party songs`,
+    `Akon party songs`,
+    `Sean Paul dancehall party songs`,
+    `Major Lazer dance songs`,
+    `Marshmello party songs`,
+    `The Chainsmokers party songs`,
+    `Tiësto club hits`,
+    `Martin Garrix party songs`,
+    `Zedd dance hits`
+  ];
+  const bollywoodParty=[
+    `Bollywood party songs ${y}`,
+    `Badshah party songs`,
+    `Yo Yo Honey Singh party songs`,
+    `Bollywood dance hits ${y}`
+  ];
+  return[...hollywoodParty.slice(0,6),...bollywoodParty.slice(0,2),...rotateQueries([
     `global trending songs ${y}`,
     `viral songs today`,
     `hollywood party songs ${y}`,
@@ -1498,7 +1521,7 @@ function trendingMixQueries(){
     `punjabi party hits ${y}`,
     `tamil party hits ${y}`,
     `telugu party hits ${y}`
-  ]);
+  ]),...hollywoodParty.slice(6),...bollywoodParty.slice(2)];
 }
 async function loadTrendingMix(force=false){
   if(trendingMixInitialized&&!force&&!searchQuery)return;
@@ -1510,11 +1533,11 @@ async function loadTrendingMix(force=false){
   const c=document.getElementById('search-results');
   c.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading trending mix...</div>';
   const queries=trendingMixQueries();
-  const first=queries.slice(0,6);
+  const first=queries.slice(0,10);
   first.forEach(q=>searchUsedQueries.add(q));
   let mixed=await multiQuery(first);
   if(!mixed.length){
-    const fallback=queries.slice(6,14).filter(q=>!searchUsedQueries.has(q));
+    const fallback=queries.slice(10,20).filter(q=>!searchUsedQueries.has(q));
     fallback.forEach(q=>searchUsedQueries.add(q));
     mixed=await multiQuery(fallback);
   }

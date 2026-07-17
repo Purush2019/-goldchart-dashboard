@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.26 - 2026-07-17
+
+- Added explicit Hollywood party artist seeds to Trending, including Pitbull, DJ Snake, David Guetta, Calvin Harris, Flo Rida, LMFAO, and more.
+- Expanded the first Trending fetch batch so Hollywood and Bollywood party songs appear sooner.
+
 ## 1.0.25 - 2026-07-17
 
 - Fixed the Trending tab so it always clears old search state and reloads the mixed trending feed.
