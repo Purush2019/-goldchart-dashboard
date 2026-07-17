@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.15 - 2026-07-17
+
+- Replaced the dim green active-song glow with a rotating rainbow rectangle border.
+- Added a bright moving light point that travels around the selected song row.
+
 ## 1.0.14 - 2026-07-17
 
 - Added a circular lighting animation inside the currently playing song row.
