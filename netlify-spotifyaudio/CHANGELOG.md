@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.24 - 2026-07-17
+
+- Improved Home language switching between Hindi, Tamil, Telugu, and other language tabs.
+- Added in-memory language caching and background prefetch for nearby language tabs.
+- Added clearer per-language loading text while songs are being fetched.
+
 ## 1.0.23 - 2026-07-17
 
 - Made the Home song search box more compact.

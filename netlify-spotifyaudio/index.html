@@ -734,8 +734,9 @@ body{
 <script>
 const SAAVN_API='https://saavnapi-nine.vercel.app/result/';
 const FALLBACK_API='/.netlify/functions/jiosaavn';
-const APP_VERSION='1.0.23';
+const APP_VERSION='1.0.24';
 let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false,trendingMixInitialized=false,aiSearchIntent=null;
+const homeLanguageMemory=new Map(),homeLanguagePrefetching=new Set();
 let partyAllSongs=[],currentPartyLang='hindi',partyUsedQueries=new Set(),isPartyLoading=false,partyInitialized=false;
 let currentDevLang='hindi',currentKidsLang='english',currentDevId='ganesha',currentKidsId='rhymes';
 let devSongs=[],kidsSongs=[],devUsedQueries=new Set(),kidsUsedQueries=new Set(),isDevLoading=false,isKidsLoading=false;
@@ -1314,14 +1315,7 @@ async function ensureFilteredSongs(minCount=20){
   renderHomeFiltered();
   isLoadingMore=false;
 }
-async function loadTrending(lang){
-  currentLang=lang;
-  usedQueries=new Set();
-  homeAllSongs=[];
-  document.querySelectorAll('.lang-pill').forEach(p=>p.classList.toggle('active',p.textContent.toLowerCase()===lang));
-  document.getElementById('home-year-select').value='';
-  document.getElementById('home-hero-select').value='';
-  document.getElementById('home-singer-select').value='';
+function homeQueriesForLang(lang){
   const currentYear=new Date().getFullYear();
   const langWords=LANG_TERMS[lang]||[lang];
   const baseQueries=LANG_QUERIES[lang]||LANG_QUERIES.hindi;
@@ -1335,29 +1329,68 @@ async function loadTrending(lang){
     `${lw} movie songs ${currentYear}`,
     `${lw} hits ${currentYear}`
   ]);
-  const queries=rotateQueries([...curatedLatest,...latestQueries,...baseQueries]);
+  return rotateQueries([...curatedLatest,...latestQueries,...baseQueries]);
+}
+function renderHomeLanguageLoading(lang){
+  const label=(LANGUAGE_OPTIONS.find(([value])=>value===lang)||['',lang])[1];
+  document.getElementById('home-content').innerHTML=`<div class="loading"><span class="spinner"></span><br>Loading ${esc(label)} songs...</div>`;
+}
+function prefetchHomeLanguages(activeLang){
+  const order=LANGUAGE_OPTIONS.map(([value])=>value);
+  const idx=order.indexOf(activeLang);
+  const targets=[order[idx+1],order[idx+2],order[idx-1]].filter(Boolean);
+  targets.forEach(lang=>prefetchHomeLanguage(lang));
+}
+async function prefetchHomeLanguage(lang){
+  if(homeLanguageMemory.has(lang)||homeLanguagePrefetching.has(lang)||readCachedSongs('home',lang).length)return;
+  homeLanguagePrefetching.add(lang);
+  try{
+    const queries=homeQueriesForLang(lang).slice(0,4);
+    const songs=await multiQuery(queries);
+    if(songs.length){
+      const merged=sortByLatestRelevance(uniqueSongs(songs),songs,'home');
+      homeLanguageMemory.set(lang,merged);
+      writeCachedSongs('home',lang,merged);
+    }
+  }catch(_){
+  }finally{
+    homeLanguagePrefetching.delete(lang);
+  }
+}
+async function loadTrending(lang){
+  currentLang=lang;
+  usedQueries=new Set();
+  homeAllSongs=[];
+  document.querySelectorAll('.lang-pill').forEach(p=>p.classList.toggle('active',p.textContent.toLowerCase()===lang));
+  document.getElementById('home-year-select').value='';
+  document.getElementById('home-hero-select').value='';
+  document.getElementById('home-singer-select').value='';
+  const queries=homeQueriesForLang(lang);
   queries.forEach(q=>usedQueries.add(q));
-  const c=document.getElementById('home-content');
-  const cached=readCachedSongs('home',lang);
+  const memory=homeLanguageMemory.get(lang)||[];
+  const cached=memory.length?memory:readCachedSongs('home',lang);
   if(cached.length){
-    homeAllSongs=cached;
+    homeAllSongs=cached.slice();
     updateHomeDropdownsFromSongs(homeAllSongs);
     renderHomeFiltered();
   }else{
-    c.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading...</div>';
+    renderHomeLanguageLoading(lang);
   }
   const firstBatch=queries.slice(0,2);
   const remaining=queries.slice(2);
   const firstSongs=await multiQuery(firstBatch);
   if(currentLang!==lang)return;
   homeAllSongs=mergeSongs(homeAllSongs,firstSongs);
+  homeLanguageMemory.set(lang,homeAllSongs.slice());
   updateHomeDropdownsFromSongs(homeAllSongs);
   renderHomeFiltered();
   writeCachedSongs('home',lang,homeAllSongs);
+  prefetchHomeLanguages(lang);
   if(remaining.length){
     multiQuery(remaining).then(extra=>{
       if(currentLang!==lang||!extra.length)return;
       homeAllSongs=mergeSongs(homeAllSongs,extra);
+      homeLanguageMemory.set(lang,homeAllSongs.slice());
       updateHomeDropdownsFromSongs(homeAllSongs);
       renderHomeFiltered();
       writeCachedSongs('home',lang,homeAllSongs);
