@@ -1,0 +1,1713 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Spotify Audio</title>
+
+<!-- PWA -->
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#1DB954">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Music">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#121212;--card:#181818;--card2:#282828;--accent:#1DB954;--accent2:#1ed760;--text:#ffffff;--text2:#b3b3b3;--border:#333333}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+
+/* Optional real video background for selected songs */
+.song-video-backdrop{position:fixed;inset:0;z-index:0;pointer-events:none;background:#000;opacity:0;visibility:hidden;transition:opacity .35s ease,visibility .35s ease}
+.song-video-backdrop.active{opacity:1;visibility:visible}
+.song-video-backdrop video{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(1.05) contrast(1.04)}
+.song-video-backdrop::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.58),rgba(18,18,18,.68) 42%,rgba(18,18,18,.96))}
+.header,.search-section,.tabs,.content,.now-playing,.toast-box{position:relative}
+.header,.search-section,.tabs,.content{z-index:2}
+.now-playing{z-index:200}
+.toast-box{z-index:9999}
+.song-has-video{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.72);color:#fff;border:1px solid rgba(255,255,255,.22);border-radius:4px;padding:1px 4px;font-size:.56rem;font-weight:800;letter-spacing:.04em}
+.video-side-panel{position:fixed;top:90px;right:10px;bottom:108px;width:min(430px,30vw);min-width:330px;background:#121212;border:1px solid var(--border);border-radius:12px;z-index:160;display:none;overflow:hidden;box-shadow:0 18px 60px rgba(0,0,0,.42)}
+.video-side-panel.preloaded,.video-side-panel.active{display:flex;flex-direction:column}
+.video-side-panel.preloaded{left:auto;right:10px;opacity:0;pointer-events:none;transform:translateX(120vw)}
+.video-side-panel.active{left:auto;right:10px;opacity:1;pointer-events:auto;transform:none}
+.video-side-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px}
+.video-side-title{font-size:1rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.video-close{background:#2a2a2a;border:0;color:#fff;width:34px;height:34px;border-radius:50%;font-size:1rem;cursor:pointer}
+.video-frame-wrap{margin:0 16px;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:16/9}
+.video-frame-wrap iframe{width:100%;height:100%;border:0;display:block}
+.video-panel-body{padding:18px 16px 120px;overflow:auto}
+.switch-audio-btn{border:0;background:#2b2b2b;color:#fff;border-radius:999px;padding:12px 18px;font-weight:800;cursor:pointer}
+.switch-audio-btn:hover{background:#3a3a3a}
+.video-mode-controls{display:flex;align-items:center;gap:10px;margin-top:14px}
+.video-mode-controls button{border:0;background:#2b2b2b;color:#fff;border-radius:999px;padding:10px 14px;font-weight:800;cursor:pointer}
+.video-mode-controls button:hover{background:#3a3a3a}
+.video-mode-controls .video-play-toggle{background:#fff;color:#000}
+.video-song-name{margin-top:24px;font-size:1.55rem;font-weight:900;line-height:1.1}
+.video-song-artist{margin-top:6px;color:var(--text2);font-size:.95rem;line-height:1.35}
+.related-heading{margin-top:28px;font-size:1rem;font-weight:850}
+
+/* Header */
+.header{background:#000000;padding:14px 20px;padding-top:calc(env(safe-area-inset-top, 0px) + 14px);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.header .logo{font-size:1.3rem;font-weight:700;color:var(--accent);display:flex;align-items:center;gap:10px}
+.header .logo img{width:32px;height:32px;display:block;flex-shrink:0}
+.header .logo span{color:var(--text)}
+.header .back-btn{background:var(--card);border:1px solid var(--border);color:var(--text2);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:.8rem}
+.header .back-btn:hover{background:var(--card2)}
+
+/* Search */
+.search-section{padding:16px 20px 8px}
+.search-wrap{position:relative}
+.search-wrap input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);padding:14px 14px 14px 44px;border-radius:12px;font-size:1rem;outline:none;transition:border .2s}
+.search-wrap input:focus{border-color:var(--accent);background:var(--card2)}
+.search-wrap .s-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:1.1rem;color:var(--text2)}
+.search-wrap input{padding-right:48px}
+.mic-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;background:transparent;border:1px solid transparent;color:var(--text2);cursor:pointer;padding:0;border-radius:50%;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.mic-btn svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.mic-btn:hover{color:var(--accent);background:rgba(29,185,84,.12);border-color:rgba(29,185,84,.22)}
+.mic-btn.listening{color:var(--accent);background:rgba(29,185,84,.16);border-color:rgba(29,185,84,.4);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* Tabs */
+.tabs{display:flex;gap:0;padding:0 20px;border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:12px 18px;font-size:.85rem;color:var(--text2);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s;font-weight:600}
+.tab.active{color:#fff;border-bottom-color:var(--accent)}
+
+/* Content area */
+.content{padding:12px 20px 160px;min-height:50vh}
+
+/* Section header */
+.sec-title{font-size:1rem;font-weight:600;margin:16px 0 10px;display:flex;align-items:center;gap:8px}
+
+/* Song list */
+.song-list{list-style:none}
+.song-item{display:flex;align-items:center;gap:12px;padding:12px 10px;border-radius:8px;cursor:pointer;transition:background .2s;position:relative}
+.song-item:hover,.song-item.playing{background:var(--card2)}
+.song-item.playing .s-title{color:var(--accent)}
+.song-item .s-art{width:48px;height:48px;border-radius:4px;object-fit:cover;flex-shrink:0;background:var(--card);position:relative}
+.song-item .s-info{flex:1;min-width:0}
+.song-item .s-title{font-size:.9rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.song-item .s-artist{font-size:.8rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.song-item .s-duration{font-size:.75rem;color:var(--text2);flex-shrink:0;margin-right:4px}
+.song-item .s-actions{display:flex;gap:4px;flex-shrink:0;align-items:center}
+.song-item .s-actions .s-play-btn{width:40px;height:40px;border-radius:50%;background:var(--accent);border:none;color:#000;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.song-item .s-actions .s-play-btn:hover{background:var(--accent2);transform:scale(1.06)}
+.song-item .s-actions .s-play-btn svg{width:16px;height:16px;fill:#000}
+.song-item .s-actions .s-q-btn{width:32px;height:32px;border-radius:50%;background:transparent;border:1px solid var(--border);color:var(--text2);cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.song-item .s-actions .s-q-btn:hover{border-color:var(--text);color:var(--text)}
+
+/* Album/Playlist grid */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-bottom:16px}
+.card-item{background:var(--card);border-radius:12px;overflow:hidden;cursor:pointer;transition:transform .2s,box-shadow .2s}
+.card-item:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(29,185,84,.15)}
+.card-item img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.card-item .c-info{padding:10px}
+.card-item .c-name{font-size:.82rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-item .c-sub{font-size:.72rem;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Horizontal scroll row */
+.h-scroll{display:flex;gap:14px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch}
+.h-scroll::-webkit-scrollbar{height:4px}
+.h-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.h-scroll .card-item{min-width:140px;max-width:140px;flex-shrink:0}
+
+/* Loading / Empty */
+.loading,.empty{text-align:center;padding:40px 20px;color:var(--text2)}
+.loading .spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty .icon{font-size:3rem;margin-bottom:12px}
+
+/* Lang pills */
+.lang-pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.lang-pill{background:var(--card);border:1px solid var(--border);padding:8px 16px;border-radius:20px;font-size:.82rem;cursor:pointer;transition:all .2s}
+.lang-pill:hover,.lang-pill.active{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
+
+/* ═══ Now Playing Bar ═══ */
+.now-playing{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(180deg,#282828,#181818);border-top:1px solid var(--border);z-index:200;display:none}
+.np-progress{height:3px;background:var(--border);cursor:pointer}
+.np-progress .fill{height:100%;background:var(--accent);width:0;transition:width .3s linear}
+.np-main{display:flex;align-items:center;padding:10px 16px;gap:12px}
+.np-art{width:50px;height:50px;border-radius:8px;object-fit:cover;flex-shrink:0}
+.np-info{flex:1;min-width:0}
+.np-title{font-size:.88rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-artist{font-size:.76rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-controls{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.np-controls button{background:none;border:none;color:var(--text);cursor:pointer;font-size:1.3rem;padding:4px;transition:color .2s}
+.np-controls button:hover{color:var(--accent)}
+.np-controls .play-btn{width:48px;height:48px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#000;transition:transform .1s}
+.np-controls .play-btn:hover{background:#fff;transform:scale(1.06)}
+.np-controls .seek-btn{font-size:1rem;opacity:.7}
+.np-controls .seek-btn:hover{opacity:1;color:var(--accent)}
+.np-controls .video-btn{font-size:.7rem;font-weight:800;letter-spacing:.02em;border:1px solid var(--border);border-radius:999px;padding:7px 9px;color:var(--text2)}
+.np-controls .video-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(29,185,84,.12)}
+.np-time{display:flex;justify-content:space-between;padding:0 16px 8px;font-size:.7rem;color:var(--text2)}
+
+/* Queue indicator */
+.queue-count{background:var(--accent);color:#fff;font-size:.65rem;padding:2px 6px;border-radius:10px;margin-left:4px}
+
+/* God cards grid */
+.god-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;margin-bottom:20px}
+.god-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 8px;text-align:center;cursor:pointer;transition:all .2s}
+.god-card:hover,.god-card.active{background:var(--accent);border-color:var(--accent);color:#000;transform:translateY(-2px);box-shadow:0 4px 16px rgba(29,185,84,.25)}
+.god-card .g-icon{font-size:2rem;margin-bottom:6px}
+.god-card .g-name{font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.god-card.active .g-name{color:#fff}
+
+/* Devotional language pills */
+.dev-langs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.dev-lang{background:var(--card);border:1px solid var(--border);padding:6px 14px;border-radius:16px;font-size:.78rem;cursor:pointer;transition:all .2s}
+.dev-lang:hover,.dev-lang.active{background:#f59e0b;border-color:#f59e0b;color:#000;font-weight:600}
+
+/* Toast */
+.toast-box{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{background:var(--accent);color:#fff;padding:10px 20px;border-radius:8px;font-size:.85rem;pointer-events:auto;max-width:90vw;word-break:break-word;animation:fadeIn .3s}
+.toast.success{background:#059669}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Load more */
+.load-more-wrap{display:flex;justify-content:center;margin:10px 0 18px}
+.load-more-btn{background:var(--card2);color:var(--text);border:1px solid var(--border);padding:9px 18px;border-radius:20px;cursor:pointer;font-size:.84rem;font-weight:600}
+.load-more-btn:hover{border-color:var(--accent);color:var(--accent)}
+.filter-row{margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+.filter-row::-webkit-scrollbar{display:none}
+.filter-row label{font-size:.76rem;color:var(--text2);white-space:nowrap;flex-shrink:0}
+.filter-row select{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:.78rem;min-width:0;max-width:112px;text-overflow:ellipsis;flex:0 1 112px}
+.filter-row .year-select{max-width:76px;flex-basis:76px}
+@media(max-width:480px){
+  .np-main{gap:8px;padding:8px 10px}
+  .np-art{width:44px;height:44px}
+  .np-controls{gap:3px}
+  .np-controls button{font-size:1.05rem;padding:3px}
+  .np-controls .play-btn{width:40px;height:40px}
+  .np-controls .seek-btn{font-size:.95rem}
+}
+@media(min-width:1024px){
+  body.video-mode .content{padding-right:calc(min(430px,30vw) + 34px)}
+}
+@media(max-width:1024px), (hover:none) and (pointer:coarse){
+  .video-side-panel{inset:0;width:auto;min-width:0;border-radius:0;border:0;z-index:500;background:#0b0b0b}
+  .video-side-panel.preloaded{inset:0;opacity:0;pointer-events:none;transform:translateX(120vw)}
+  .video-side-panel.active{inset:0;opacity:1;pointer-events:auto;transform:none}
+  .video-side-head{padding-top:calc(env(safe-area-inset-top,0px) + 14px)}
+  .video-frame-wrap{margin:0;background:#000;border-radius:0;aspect-ratio:16/9}
+  .video-panel-body{padding-bottom:150px}
+  body.video-mode .header,body.video-mode .search-section,body.video-mode .tabs,body.video-mode .content{display:none}
+}
+</style>
+</head>
+<body>
+<div class="song-video-backdrop" id="song-video-backdrop" aria-hidden="true">
+  <video id="song-video" muted loop playsinline preload="metadata"></video>
+</div>
+<input id="song-video-file" type="file" accept="video/mp4,video/webm,video/*" hidden>
+<div class="header"><div class="logo"><img src="./icon.svg" alt="Spotify logo"><span>Spotify Audio</span></div></div>
+<div class="search-section">
+  <div class="search-wrap">
+    <span class="s-icon">🔍</span>
+    <input type="text" id="search-input" placeholder="Search songs, albums, artists..." autocomplete="off">
+    <button class="mic-btn" id="mic-btn" onclick="toggleMic()" aria-label="Voice search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/><path d="M8 22h8"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="home" onclick="showTab('home')">🏠 Home</div>
+  <div class="tab" data-tab="party" onclick="showTab('party')">🎉 Party</div>
+  <div class="tab" data-tab="devotional" onclick="showTab('devotional')">🙏 Devotional</div>
+  <div class="tab" data-tab="kids" onclick="showTab('kids')">👶 Kids</div>
+  <div class="tab" data-tab="search" onclick="showTab('search')">🔍 Results</div>
+  <div class="tab" data-tab="queue" onclick="showTab('queue')">📋 Queue <span class="queue-count" id="queue-count">0</span></div>
+</div>
+
+<div class="content">
+  <div class="tab-content" id="tab-home">
+    <div class="lang-pills" id="lang-pills">
+      <div class="lang-pill active" onclick="loadTrending('hindi')">Hindi</div>
+      <div class="lang-pill" onclick="loadTrending('tamil')">Tamil</div>
+      <div class="lang-pill" onclick="loadTrending('telugu')">Telugu</div>
+      <div class="lang-pill" onclick="loadTrending('punjabi')">Punjabi</div>
+      <div class="lang-pill" onclick="loadTrending('malayalam')">Malayalam</div>
+      <div class="lang-pill" onclick="loadTrending('kannada')">Kannada</div>
+      <div class="lang-pill" onclick="loadTrending('nepali')">Nepali</div>
+      <div class="lang-pill" onclick="loadTrending('english')">English</div>
+    </div>
+    <div class="filter-row">
+      <label>Year</label>
+      <select id="home-year-select" class="year-select"><option>All</option></select>
+      <label>Actor</label>
+      <select id="home-hero-select"><option value="">All</option></select>
+      <label>Singer</label>
+      <select id="home-singer-select"><option value="">All</option></select>
+    </div>
+    <div id="home-content"><div class="loading"><span class="spinner"></span><br>Loading...</div></div>
+  </div>
+  <div class="tab-content" id="tab-search" style="display:none"><div id="search-results"></div></div>
+  <div class="tab-content" id="tab-queue" style="display:none"><div id="queue-content"></div></div>
+  <div class="tab-content" id="tab-devotional" style="display:none"><div id="devotional-content"></div></div>
+  <div class="tab-content" id="tab-party" style="display:none">
+    <div class="lang-pills" id="party-lang-pills">
+      <div class="lang-pill active" onclick="loadPartyLang('hindi')">Hindi</div>
+      <div class="lang-pill" onclick="loadPartyLang('tamil')">Tamil</div>
+      <div class="lang-pill" onclick="loadPartyLang('telugu')">Telugu</div>
+      <div class="lang-pill" onclick="loadPartyLang('punjabi')">Punjabi</div>
+      <div class="lang-pill" onclick="loadPartyLang('malayalam')">Malayalam</div>
+      <div class="lang-pill" onclick="loadPartyLang('kannada')">Kannada</div>
+      <div class="lang-pill" onclick="loadPartyLang('nepali')">Nepali</div>
+      <div class="lang-pill" onclick="loadPartyLang('english')">English</div>
+    </div>
+    <div class="filter-row">
+      <label>Year</label>
+      <select id="party-year-select" class="year-select"><option value="">All</option></select>
+      <label>Actor</label>
+      <select id="party-hero-select"><option value="">All</option></select>
+      <label>Singer</label>
+      <select id="party-singer-select"><option value="">All</option></select>
+    </div>
+    <div id="party-content"><div class="loading"><span class="spinner"></span><br>Loading party songs...</div></div>
+  </div>
+  <div class="tab-content" id="tab-kids" style="display:none"><div id="kids-content"></div></div>
+</div>
+
+<aside class="video-side-panel" id="video-side-panel" aria-label="Song video panel">
+  <div class="video-side-head">
+    <div class="video-side-title" id="video-panel-title">Music video</div>
+    <button class="video-close" onclick="switchToAudio()" aria-label="Close video">×</button>
+  </div>
+  <div class="video-frame-wrap">
+    <iframe id="youtube-video-frame" title="Song video" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+  </div>
+  <div class="video-panel-body">
+    <button class="switch-audio-btn" onclick="switchToAudio()">♫ Switch to audio</button>
+    <div class="video-mode-controls">
+      <button onclick="prevVideoTrack()" aria-label="Previous video">⏮</button>
+      <button class="video-play-toggle" onclick="togglePlay()" aria-label="Pause or play audio">⏯</button>
+      <button onclick="nextVideoTrack()" aria-label="Next video">⏭</button>
+    </div>
+    <div class="video-song-name" id="video-song-name">—</div>
+    <div class="video-song-artist" id="video-song-artist">—</div>
+    <div class="related-heading">Related music videos</div>
+  </div>
+</aside>
+
+<div class="now-playing" id="now-playing">
+  <div class="np-progress" id="np-progress-bar" onclick="seekTo(event)"><div class="fill" id="np-progress-fill"></div></div>
+  <div class="np-main">
+    <img class="np-art" id="np-art" src="" alt="">
+    <div class="np-info"><div class="np-title" id="np-title">—</div><div class="np-artist" id="np-artist">—</div></div>
+    <div class="np-controls"><button onclick="prevTrack()" aria-label="Previous song">⏮</button><button class="seek-btn" onclick="rewindTrack()" aria-label="Back 10 seconds">⏪</button><button class="play-btn" id="btn-play" onclick="togglePlay()">▶</button><button class="seek-btn" onclick="forwardTrack()" aria-label="Forward 10 seconds">⏩</button><button onclick="nextTrack()" aria-label="Next song">⏭</button><button class="video-btn" id="btn-video" onclick="playCurrentSongVideo()" aria-label="Find and play music video">VIDEO</button></div>
+  </div>
+  <div class="np-time"><span id="np-current">0:00</span><span id="np-duration">0:00</span></div>
+</div>
+<div class="toast-box" id="toast-box"></div>
+
+<script>
+const SAAVN_API='https://saavnapi-nine.vercel.app/result/';
+const FALLBACK_API='/.netlify/functions/jiosaavn';
+const APP_VERSION='1.0.1';
+let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false;
+let partyAllSongs=[],currentPartyLang='hindi',partyUsedQueries=new Set(),isPartyLoading=false,partyInitialized=false;
+let currentDevLang='hindi',currentKidsLang='english',currentDevId='ganesha',currentKidsId='rhymes';
+let devSongs=[],kidsSongs=[],devUsedQueries=new Set(),kidsUsedQueries=new Set(),isDevLoading=false,isKidsLoading=false;
+let lastAudioTime=0,ignoreSeekUntil=0,lastPausedAt=0,resumeWatchTimer=null,pausedWhileHidden=false,recoveringLockScreenAudio=false,lockScreenMuted=false,lastVolume=1,recognition=null,isListening=false;
+const songCache={};const audio=new Audio();
+audio.playsInline=true;audio.preload='metadata';audio.crossOrigin='anonymous';
+audio.autoplay=true;
+const songVideo=document.getElementById('song-video');
+const songVideoBackdrop=document.getElementById('song-video-backdrop');
+const songVideoFile=document.getElementById('song-video-file');
+const videoSidePanel=document.getElementById('video-side-panel');
+const youtubeVideoFrame=document.getElementById('youtube-video-frame');
+const videoResultCache=new Map();
+const videoResultPending=new Map();
+let lastVideoSyncAt=0;
+let lastYouTubeTimeSyncAt=0;
+let audioMutedForVideo=false;
+let audioMuteBeforeVideo=false;
+let latestYouTubeTime=0;
+let youtubeListenTimer=null;
+const VIDEO_BACKGROUNDS={
+  // Add real MP4/WebM links here for songs that should behave like Spotify Canvas.
+  // Use song id, exact song name, or "song name - artist" as the key.
+  // Example: "my song - my artist": "./videos/my-song.mp4"
+};
+
+function updateMediaSession(song){
+  if(!('mediaSession' in navigator)||!song)return;
+  const artwork=song.image?[96,128,192,256,384,512].map(size=>({src:song.image,sizes:`${size}x${size}`,type:'image/jpeg'})):[];
+  navigator.mediaSession.metadata=new MediaMetadata({
+    title:song.name||'Unknown',
+    artist:song.artist||'',
+    album:'Spotify Audio',
+    artwork
+  });
+  navigator.mediaSession.playbackState=audio.paused?'paused':'playing';
+  setupMediaSessionControls();
+}
+function setupMediaSessionControls(){
+  if(!('mediaSession' in navigator))return;
+  const actionHandlers={
+    play:()=>lockScreenPlay(),
+    pause:()=>lockScreenPause(),
+    stop:()=>lockScreenPause(),
+    nexttrack:()=>nextTrack(),
+    previoustrack:()=>prevTrack()
+  };
+  Object.entries(actionHandlers).forEach(([action,handler])=>{
+    try{navigator.mediaSession.setActionHandler(action,handler)}catch(_){}
+  });
+  ['seekforward','seekbackward','seekto'].forEach(action=>{
+    try{navigator.mediaSession.setActionHandler(action,null)}catch(_){}
+  });
+}
+
+const LANG_QUERIES={
+  hindi:['bollywood latest songs','hindi viral songs','bollywood trending now','arijit singh','shreya ghoshal','pritam'],
+  tamil:['tamil latest songs','tamil viral songs','kollywood trending now','ar rahman tamil','anirudh ravichander','sid sriram tamil','vijay songs'],
+  telugu:['telugu latest songs','telugu viral songs','tollywood trending now','thaman s','devi sri prasad','telugu melodies','sid sriram telugu'],
+  punjabi:['punjabi latest songs','punjabi viral songs','punjabi trending now','diljit dosanjh','badshah','ap dhillon','sidhu moose wala'],
+  malayalam:['malayalam latest songs','malayalam viral songs','mollywood trending now','sushin shyam','malayalam melodies','vidyasagar','malayalam songs'],
+  kannada:['kannada latest songs','kannada viral songs','sandalwood trending now','arjun janya','kannada melodies','kannada songs'],
+  nepali:['nepali latest songs','nepali viral songs','nepali trending now','sushant kc','nepathya','nepali hits','nepali melodies'],
+  english:['pop latest songs','viral pop songs','trending music now','taylor swift','ed sheeran','billie eilish','dua lipa']
+};
+
+const PARTY_QUERIES={
+  hindi:['bollywood party songs','badshah party','honey singh dance','hindi dance hits'],
+  tamil:['tamil kuthu songs','tamil dance hits','anirudh dance','tamil mass songs'],
+  telugu:['telugu mass songs','telugu dance hits','telugu item songs'],
+  punjabi:['punjabi bhangra','diljit party','punjabi dance hits','badshah punjabi'],
+  english:['party hits dance','edm dance hits','dj remix party','david guetta party songs','pitbull party songs','calvin harris party songs','avicii dance hits','dua lipa dance songs','rihanna party songs','black eyed peas party songs','akon party songs','usher dance songs','lady gaga dance hits','shakira party songs','jennifer lopez party songs','bruno mars party songs','justin bieber dance songs','the chainsmokers party songs','marshmello party songs','major lazer dance songs','lmfao party rock songs'],
+  kannada:['kannada mass songs','kannada dance hits'],
+  malayalam:['malayalam dance songs','malayalam mass'],
+  nepali:['nepali dance songs','nepali pop hits']
+};
+
+const ENGLISH_PARTY_ARTISTS=[
+  'David Guetta','Pitbull','Calvin Harris','Avicii','Dua Lipa','Rihanna','The Weeknd','Black Eyed Peas','Akon','Usher','Lady Gaga','Shakira','Jennifer Lopez','Bruno Mars','Justin Bieber','The Chainsmokers','Marshmello','Major Lazer','LMFAO','Flo Rida','Sean Paul','Kesha','Katy Perry','Beyonce','Nicki Minaj','Ariana Grande','Sia','Martin Garrix','Tiësto','Zedd','DJ Snake','Swedish House Mafia','Clean Bandit','Jason Derulo','Enrique Iglesias','Ne-Yo','Chris Brown','Taio Cruz'
+];
+
+const CURATED_YEAR_QUERIES={
+  tamil:{
+    "2026":[
+      'Mutta Kalakki From Youth',
+      'Karuppa Kooda Va From Karuppu',
+      'Raathu Raasan From Karuppu',
+      'Aura 10/10 From Meesaya Murukku 2',
+      'Pavazha Malli From Think Indie',
+      'Loveah Sollitalea From Youth',
+      'Naanga Naalu Peru',
+      'Aasa Pulla From Youth',
+      'Adaavadi From Love Insurance Kompany',
+      'LIK songs Pradeep Ranganathan',
+      'Love Insurance Kompany Tamil songs',
+      'Youth Tamil movie songs 2026',
+      'Karuppu Tamil movie songs 2026',
+      'Meesaya Murukku 2 songs 2026',
+      'Tamil Songs 2026 New Tamil Hits 2026 Spotify'
+    ]
+  }
+};
+
+const LANGUAGE_OPTIONS=[
+  ['hindi','Hindi'],
+  ['tamil','Tamil'],
+  ['telugu','Telugu'],
+  ['punjabi','Punjabi'],
+  ['malayalam','Malayalam'],
+  ['kannada','Kannada'],
+  ['nepali','Nepali'],
+  ['english','English']
+];
+
+const DEV_CATEGORIES=[
+  {id:'ganesha',name:'Ganesha',icon:'🐘',queries:['ganesh aarti','ganesha bhajan','vakratunda mahakaya','jai ganesh']},
+  {id:'shiva',name:'Shiva',icon:'🔱',queries:['shiv bhajan','om namah shivaya','mahadev songs','shiva tandava']},
+  {id:'krishna',name:'Krishna',icon:'🦚',queries:['krishna bhajan','radha krishna songs','hare krishna','govinda bhajan']},
+  {id:'rama',name:'Rama',icon:'🏹',queries:['ram bhajan','shri ram songs','ram aarti','jai shree ram bhajan']},
+  {id:'hanuman',name:'Hanuman',icon:'💪',queries:['hanuman chalisa','hanuman bhajan','bajrang baan','jai hanuman songs']},
+  {id:'durga',name:'Durga',icon:'🦁',queries:['durga aarti','durga bhajan','navratri songs','jai mata di']},
+  {id:'lakshmi',name:'Lakshmi',icon:'🪷',queries:['lakshmi aarti','lakshmi bhajan','mahalakshmi songs','diwali lakshmi puja songs']},
+  {id:'saraswati',name:'Saraswati',icon:'🎻',queries:['saraswati vandana','saraswati bhajan','saraswati aarti','maa saraswati songs']},
+  {id:'vishnu',name:'Vishnu',icon:'🌀',queries:['vishnu sahasranamam','vishnu bhajan','om jai jagdish hare','narayana songs']},
+  {id:'venkateswara',name:'Venkateswara',icon:'⛰️',queries:['venkateswara suprabhatam','balaji bhajan','tirupati balaji songs','govinda namalu']},
+  {id:'ayyappa',name:'Ayyappa',icon:'🛕',queries:['ayyappa songs','swamiye saranam ayyappa','ayyappa bhajan','sabarimala songs']},
+  {id:'murugan',name:'Murugan',icon:'🦚',queries:['murugan songs','kanda sashti kavasam','subramanya bhajan','vel muruga songs']},
+  {id:'saibaba',name:'Sai Baba',icon:'🪔',queries:['sai baba aarti','shirdi sai baba songs','sai bhajan','om sai ram']},
+  {id:'kali',name:'Kali',icon:'🔥',queries:['kali bhajan','maa kali songs','kali aarti','dakshineswar kali songs']},
+  {id:'parvati',name:'Parvati',icon:'🌺',queries:['parvati bhajan','gauri songs','uma maheshwari songs','maa parvati aarti']},
+  {id:'surya',name:'Surya',icon:'☀️',queries:['surya mantra','aditya hridayam','surya bhajan','surya aarti']},
+  {id:'shani',name:'Shani',icon:'🪐',queries:['shani dev aarti','shani bhajan','shani mantra','shani chalisa']},
+  {id:'navagraha',name:'Navagraha',icon:'🌌',queries:['navagraha stotram','navagraha songs','navagraha mantra','graha shanti songs']},
+  {id:'devi',name:'All Devi',icon:'🪔',queries:['devi bhajan','amma songs devotional','mata songs','devi aarti']}
+];
+
+const KIDS_CATEGORIES=[
+  {id:'rhymes',name:'Rhymes',icon:'🎵',queries:['nursery rhymes','baby songs','english rhymes for kids','hindi rhymes']},
+  {id:'learning',name:'Learning',icon:'📚',queries:['kids learning songs','abc song','phonics songs','numbers song kids']},
+  {id:'cartoon',name:'Cartoon',icon:'🧸',queries:['cartoon songs','disney songs','peppa pig songs','chhota bheem songs']},
+  {id:'cocomelon',name:'CoComelon',icon:'🍉',queries:['cocomelon nursery rhymes','cocomelon songs','cocomelon abc song','cocomelon bedtime songs']},
+  {id:'pinkfong',name:'Pinkfong',icon:'🦈',queries:['pinkfong songs','baby shark song','pinkfong nursery rhymes','pinkfong kids songs']},
+  {id:'super-simple',name:'Super Simple',icon:'⭐',queries:['super simple songs','super simple nursery rhymes','super simple abc','super simple kids songs']},
+  {id:'chu-chu',name:'ChuChu TV',icon:'🚂',queries:['chuchu tv rhymes','chuchu tv nursery rhymes','chuchu tv hindi rhymes','chuchu tv baby songs']},
+  {id:'loo-loo',name:'LooLoo Kids',icon:'🎈',queries:['looloo kids songs','looloo kids nursery rhymes','looloo kids johny johny','looloo kids baby songs']},
+  {id:'little-baby-bum',name:'Little Baby Bum',icon:'🌙',queries:['little baby bum songs','little baby bum nursery rhymes','little baby bum bedtime','little baby bum wheels on the bus']},
+  {id:'bob-train',name:'Bob The Train',icon:'🚆',queries:['bob the train songs','bob the train abc','bob the train nursery rhymes','bob the train numbers']},
+  {id:'bounce-patrol',name:'Bounce Patrol',icon:'🕺',queries:['bounce patrol songs','bounce patrol nursery rhymes','bounce patrol alphabet','bounce patrol kids songs']},
+  {id:'mother-goose',name:'Mother Goose',icon:'🐣',queries:['mother goose club songs','mother goose nursery rhymes','mother goose kids songs','mother goose abc']},
+  {id:'blippi',name:'Blippi',icon:'🧢',queries:['blippi songs','blippi educational songs','blippi vehicles song','blippi kids learning']},
+  {id:'sesame',name:'Sesame Street',icon:'🟡',queries:['sesame street songs','sesame street abc','sesame street numbers','elmo songs']},
+  {id:'peppa',name:'Peppa Pig',icon:'🐷',queries:['peppa pig songs','peppa pig nursery rhymes','peppa pig kids songs','peppa pig music']},
+  {id:'disney-junior',name:'Disney Junior',icon:'🏰',queries:['disney junior songs','mickey mouse clubhouse songs','disney kids songs','frozen kids songs']},
+  {id:'hindi-kids',name:'Hindi Kids',icon:'🇮🇳',queries:['hindi balgeet','hindi nursery rhymes','lakdi ki kathi','nani teri morni']},
+  {id:'telugu-kids',name:'Telugu Kids',icon:'🌾',queries:['telugu rhymes for kids','telugu nursery rhymes','telugu kids songs','chitti chilakamma songs']},
+  {id:'tamil-kids',name:'Tamil Kids',icon:'🌼',queries:['tamil rhymes for kids','tamil nursery rhymes','tamil kids songs','tamil baby songs']}
+];
+
+const LANG_TERMS={
+  hindi:['hindi','bollywood'],
+  tamil:['tamil','kollywood'],
+  telugu:['telugu','tollywood'],
+  punjabi:['punjabi'],
+  malayalam:['malayalam','mollywood'],
+  kannada:['kannada','sandalwood'],
+  nepali:['nepali'],
+  english:['english','pop']
+};
+const LANG_SEEDS={
+  tamil:['anirudh ravichander','ar rahman','yuvan shankar raja','gv prakash','sid sriram','dhanush','vijay','ajith','suriya','sivakarthikeyan','tamil kuthu','tamil melody','tamil love','tamil movie songs','kollywood hits'],
+  hindi:['arijit singh','pritam','shreya ghoshal','jubin nautiyal','vishal shekhar','bollywood romantic','bollywood dance','hindi movie songs'],
+  telugu:['thaman s','devi sri prasad','sid sriram','anirudh telugu','telugu movie songs','telugu melody','telugu mass'],
+  malayalam:['sushin shyam','vidyasagar','malayalam movie songs','malayalam melody','malayalam hits'],
+  kannada:['arjun janya','vijay prakash','kannada movie songs','kannada melody','kannada hits'],
+  punjabi:['diljit dosanjh','ap dhillon','badshah','punjabi movie songs','punjabi dance'],
+  english:['pop hits','dance hits','love songs','top hits','viral songs'],
+  nepali:['nepali hits','nepali movie songs','nepali melody','nepali pop']
+};
+
+function showToast(m){const b=document.getElementById('toast-box');const t=document.createElement('div');t.className='toast';t.textContent=m;b.appendChild(t);setTimeout(()=>t.remove(),3000)}
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+function decodeHtml(s){if(!s)return'';const e=document.createElement('textarea');e.innerHTML=s;return e.value}
+function showTab(tab){document.querySelectorAll('.tab-content').forEach(el=>el.style.display='none');document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.tab===tab));document.getElementById('tab-'+tab).style.display='block'}
+function streamUrl(raw){return /^https?:\/\//i.test(raw||'')?`/.netlify/functions/stream?url=${encodeURIComponent(raw)}`:raw}
+function splitNames(value){
+  if(!value)return[];
+  if(Array.isArray(value))return value.flatMap(splitNames);
+  if(typeof value==='object')return Object.values(value).flatMap(splitNames);
+  return decodeHtml(String(value)).split(/,|&|\band\b|\|/i).map(x=>x.trim()).filter(Boolean);
+}
+function yearOptions(){
+  const currentYear=new Date().getFullYear();
+  const years=[];
+  for(let y=currentYear;y>=1980;y--)years.push(String(y));
+  return years;
+}
+async function apiQuery(query){
+  try{
+    const r=await fetch(`${SAAVN_API}?query=${encodeURIComponent(query)}&lyrics=false&songdata=true`);
+    if(!r.ok)throw new Error('http_'+r.status);
+    const j=await r.json();
+    return Array.isArray(j)?j:[];
+  }catch(e){
+    try{
+      const r=await fetch(`${FALLBACK_API}?query=${encodeURIComponent(query)}`);
+      const j=await r.json();
+      if(Array.isArray(j))return j;
+      return j?.data?.results||[];
+    }catch(e2){console.warn('apiQuery failed',e2);return[];}
+  }
+}
+async function multiQuery(queries){
+  const batches=await Promise.all(queries.map(async q=>{
+    const queryYear=(String(q).match(/\b(20\d{2}|19\d{2})\b/)||[])[1]||'';
+    const rows=await apiQuery(q);
+    return rows.map(s=>({...s,_query:q,_queryYear:queryYear}));
+  }));
+  const seen=new Set();const merged=[];
+  batches.flat().forEach(s=>{const id=String(s.id||s.songid||s.media_url||'');if(id&&!seen.has(id)){seen.add(id);merged.push(s);}});
+  return merged;
+}
+const HOME_CACHE_TTL=1000*60*45;
+const DEFAULT_CACHE_TTL=1000*60*60*6;
+function cacheKey(type,key){return `spotifyaudio:${type}:${key}`}
+function readCachedSongs(type,key){
+  try{
+    const cached=JSON.parse(localStorage.getItem(cacheKey(type,key))||'null');
+    const ttl=type==='home'?HOME_CACHE_TTL:DEFAULT_CACHE_TTL;
+    if(!cached||!Array.isArray(cached.songs)||Date.now()-cached.ts>ttl)return[];
+    return cached.songs;
+  }catch(_){return[]}
+}
+function writeCachedSongs(type,key,songs){
+  try{
+    localStorage.setItem(cacheKey(type,key),JSON.stringify({ts:Date.now(),songs:songs.slice(0,300)}));
+  }catch(_){}
+}
+function songIdentity(song){
+  const n=normalizeSong(song);
+  const clean=value=>decodeHtml(String(value||''))
+    .toLowerCase()
+    .replace(/\([^)]*\)|\[[^\]]*\]/g,' ')
+    .replace(/\b(from|feat|featuring|official|video|lyrical|song|single|original|soundtrack|ost|movie|film|version|remix)\b/g,' ')
+    .replace(/[^a-z0-9]+/g,' ')
+    .trim();
+  const title=clean(n.name);
+  const artist=clean(n.artist).split(' ').slice(0,4).join(' ');
+  return `${title}|${artist}`;
+}
+function uniqueSongs(songs){
+  const seen=new Set();
+  const out=[];
+  for(const song of songs){
+    const id=String(song.id||song.songid||song.media_url||song.previewUrl||'');
+    const key=songIdentity(song)||id;
+    if(!key||seen.has(key)||seen.has(id))continue;
+    seen.add(key);
+    if(id)seen.add(id);
+    out.push(song);
+  }
+  return out;
+}
+function mergeSongs(base,extra){
+  return uniqueSongs([...base,...extra]);
+}
+function monthName(){
+  return new Date().toLocaleString('en-US',{month:'long'});
+}
+function rotateQueries(queries,seed=new Date().getHours()){
+  const unique=[...new Set(queries.map(x=>x.trim()).filter(Boolean))];
+  if(!unique.length)return unique;
+  const offset=Math.abs(Number(seed)||0)%unique.length;
+  return [...unique.slice(offset),...unique.slice(0,offset)];
+}
+function normalizeVideoKey(value){return decodeHtml(String(value||'')).trim().toLowerCase()}
+function readCustomVideoBackgrounds(){
+  try{return JSON.parse(localStorage.getItem('spotifyaudio:video-backgrounds')||'{}')||{}}
+  catch(_){return{}}
+}
+function directVideoUrlFromSong(s){
+  return s.videoUrl||
+    s.video_url||
+    s.canvasUrl||
+    s.canvas_url||
+    s.backgroundVideo||
+    s.background_video||
+    s.more_info?.videoUrl||
+    s.more_info?.video_url||
+    s.more_info?.canvasUrl||
+    s.more_info?.canvas_url||
+    '';
+}
+function videoUrlForSong(s,id,name,artist){
+  const direct=directVideoUrlFromSong(s);
+  if(direct)return direct;
+  const custom={...VIDEO_BACKGROUNDS,...readCustomVideoBackgrounds()};
+  const keys=[id,name,`${name} - ${artist}`].map(normalizeVideoKey);
+  const match=Object.entries(custom).find(([key])=>keys.includes(normalizeVideoKey(key)));
+  return match?.[1]||'';
+}
+function normalizeSong(s){
+  const id=String(s.id||s.songid||s.media_url||Math.random().toString(36).slice(2));
+  const name=decodeHtml(s.song||s.name||s.title||'Unknown');
+  const artist=decodeHtml(s.primary_artists||s.singers||s.artistName||'Unknown Artist');
+  const image=((s.image||'')+'').replace(/50x50|150x150/g,'500x500');
+  const rawUrl=s.media_url||s.previewUrl||'';
+  const url=streamUrl(rawUrl);
+  const videoUrl=videoUrlForSong(s,id,name,artist);
+  const releaseYear=(s.year||s.more_info?.year||(s.release_date||s.more_info?.release_date||'').toString().slice(0,4)||'').toString();
+  const year=releaseYear||String(s._queryYear||'');
+  // Build comprehensive match list for filtering, plus actor-only list for the dropdown.
+  let artistsList=[];
+  if(s.artistMap&&typeof s.artistMap==='object'&&!Array.isArray(s.artistMap)){
+    artistsList=Object.keys(s.artistMap).map(decodeHtml);
+  }else{
+    const combined=[s.primary_artists,s.singers,s.featured_artists,s.starring].filter(Boolean).map(decodeHtml).join(',');
+    artistsList=combined.split(',').map(a=>a.trim()).filter(Boolean);
+  }
+  artistsList=[...new Set(artistsList)];
+  let actorsList=[
+    ...splitNames(s.starring),
+    ...splitNames(s.actors),
+    ...splitNames(s.actor),
+    ...splitNames(s.actress),
+    ...splitNames(s.cast),
+    ...splitNames(s.more_info?.starring),
+    ...splitNames(s.more_info?.actors),
+    ...splitNames(s.more_info?.cast)
+  ];
+  if(s.artistMap&&typeof s.artistMap==='object'&&!Array.isArray(s.artistMap)){
+    Object.entries(s.artistMap).forEach(([role,value])=>{
+      if(/actor|actress|cast|starring/i.test(role))actorsList.push(...splitNames(value));
+    });
+  }
+  actorsList=[...new Set(actorsList.map(a=>a.trim()).filter(Boolean))];
+  let singersList=[
+    ...splitNames(s.singers),
+    ...splitNames(s.primary_artists),
+    ...splitNames(s.featured_artists),
+    ...splitNames(s.artistName),
+    ...splitNames(s.more_info?.singers),
+    ...splitNames(s.more_info?.primary_artists)
+  ];
+  if(s.artistMap&&typeof s.artistMap==='object'&&!Array.isArray(s.artistMap)){
+    Object.entries(s.artistMap).forEach(([role,value])=>{
+      if(/singer|vocal|artist|primary/i.test(role)&&!/actor|actress|cast|starring/i.test(role))singersList.push(...splitNames(value));
+    });
+  }
+  singersList=[...new Set(singersList.map(a=>a.trim()).filter(Boolean))];
+  return{id,name,artist,image,url,rawUrl,urls:url?[url]:[],videoUrl,duration:parseInt(s.duration||0),year,artistsList,actorsList,singersList};
+}
+function artistMatchesSong(song,artist){
+  if(!artist)return true;
+  const target=artist.toLowerCase();
+  const n=normalizeSong(song);
+  const haystack=[
+    n.name,
+    n.artist,
+    ...n.artistsList,
+    song.primary_artists,
+    song.singers,
+    song.featured_artists,
+    song.starring,
+    song.album,
+    song.movie,
+    song.subtitle,
+    song.title
+  ].filter(Boolean).map(x=>decodeHtml(String(x)).toLowerCase());
+  return haystack.some(value=>value===target||value.includes(target));
+}
+function singerMatchesSong(song,singer){
+  if(!singer)return true;
+  const target=singer.toLowerCase();
+  const targetParts=target.split(/\s+/).filter(Boolean);
+  const n=normalizeSong(song);
+  const haystack=[...n.singersList,song.singers,song.primary_artists,song.featured_artists,song.artistName].filter(Boolean).map(x=>decodeHtml(String(x)).toLowerCase());
+  return haystack.some(value=>{
+    if(value===target||value.includes(target))return true;
+    const parts=value.split(/\s+/).filter(Boolean);
+    return targetParts.every(part=>parts.some(v=>v.startsWith(part)));
+  });
+}
+function songItemHtml(s){const n=normalizeSong(s);songCache[n.id]=n;return `<li class="song-item" id="song-${esc(n.id)}" data-song-id="${esc(n.id)}" onclick="playSong('${esc(n.id)}',this)"><img class="s-art" src="${esc(n.image)}">${n.videoUrl?'<span class="song-has-video">VIDEO</span>':''}<div class="s-info"><div class="s-title">${esc(n.name)}</div><div class="s-artist">${esc(n.artist)}</div></div><div class="s-actions"><button class="s-q-btn" onclick="event.stopPropagation();addToQueue('${esc(n.id)}')">+</button><button class="s-play-btn" onclick="event.stopPropagation();playSong('${esc(n.id)}',this.closest('.song-item'))">▶</button></div></li>`}
+function updateHomeDropdownsFromSongs(songs){
+  const yearSel=document.getElementById('home-year-select');
+  const artistSel=document.getElementById('home-hero-select');
+  const singerSel=document.getElementById('home-singer-select');
+  const selectedYear=yearSel.value.trim();
+  const selectedArtist=artistSel.value.trim();
+  const selectedSinger=singerSel.value.trim();
+  const norm=songs.map(normalizeSong);
+  const years=[...new Set([...yearOptions(),...norm.map(s=>s.year).filter(Boolean),selectedYear].filter(Boolean))].sort((a,b)=>Number(b)-Number(a));
+  const artists=[...new Set([...norm.flatMap(s=>s.actorsList).filter(Boolean),selectedArtist].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const singers=[...new Set([...norm.flatMap(s=>s.singersList).filter(Boolean),selectedSinger].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  yearSel.innerHTML='<option value="">All</option>'+years.map(y=>`<option value="${esc(y)}">${esc(y)}</option>`).join('');
+  artistSel.innerHTML='<option value="">All</option>'+artists.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  singerSel.innerHTML='<option value="">All</option>'+singers.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  yearSel.value=selectedYear;
+  artistSel.value=selectedArtist;
+  singerSel.value=selectedSinger;
+}
+function getHomeFilters(){
+  return{
+    year:document.getElementById('home-year-select').value.trim(),
+    artist:document.getElementById('home-hero-select').value.trim(),
+    singer:document.getElementById('home-singer-select').value.trim()
+  };
+}
+function getFilteredHomeSongs(year,artist,singer=''){
+  let filtered=uniqueSongs(homeAllSongs);
+  if(year)filtered=filtered.filter(s=>normalizeSong(s).year===year);
+  if(artist)filtered=filtered.filter(s=>artistMatchesSong(s,artist));
+  if(singer)filtered=filtered.filter(s=>singerMatchesSong(s,singer));
+  return filtered.slice().sort((a,b)=>{
+    const ay=Number(normalizeSong(a).year||0);
+    const by=Number(normalizeSong(b).year||0);
+    if(by!==ay)return by-ay;
+    return String(normalizeSong(a).name).localeCompare(String(normalizeSong(b).name));
+  });
+}
+function renderHomeFiltered(){
+  const {year,artist,singer}=getHomeFilters();
+  const filtered=getFilteredHomeSongs(year,artist,singer);
+  const c=document.getElementById('home-content');
+  let html='';
+  if(filtered.length){
+    html+='<ul class="song-list">';filtered.forEach(s=>html+=songItemHtml(s));html+='</ul>';
+    html+=`<div style="text-align:center;color:var(--text2);font-size:.75rem;margin:4px 0 6px">Showing ${filtered.length} of ${homeAllSongs.length} loaded</div>`;
+  }else{
+    html+='<div class="empty"><div class="icon">🔎</div><div class="msg">No songs match these filters yet<br><span style="font-size:.75rem">Click below to fetch more</span></div></div>';
+  }
+  let label='🔍 Load more songs';
+  if(year&&artist&&singer)label=`🔍 Load more ${artist} ${singer} ${year} songs`;
+  else if(year&&singer)label=`🔍 Load more ${singer} ${year} songs`;
+  else if(artist&&singer)label=`🔍 Load more ${artist} ${singer} songs`;
+  else if(year&&artist)label=`🔍 Load more ${artist} ${year} songs`;
+  else if(year)label=`🔍 Load more ${currentLang} ${year} songs`;
+  else if(artist)label=`🔍 Load more ${artist} songs`;
+  else if(singer)label=`🔍 Load more ${singer} songs`;
+  else label=`🔍 Load more ${currentLang} songs`;
+  html+=`<div class="load-more-wrap"><button id="load-more-btn" class="load-more-btn" onclick="loadMoreSongs()">${esc(label)}</button></div>`;
+  c.innerHTML=html;
+}
+function generateExtraQueries(lang,year,artist,singer=''){
+  const langWords=LANG_TERMS[lang]||[lang];
+  const currentYear=new Date().getFullYear();
+  const q=[...((CURATED_YEAR_QUERIES[lang]||{})[year]||[])];
+  if(singer&&artist&&year){
+    q.push(`${artist} ${singer} ${year}`,`${artist} ${singer} songs ${year}`,`${artist} ${singer} hits ${year}`,`${artist} ${singer} ${langWords[0]} ${year}`);
+    for(const lw of langWords)q.push(`${artist} ${singer} ${lw} songs ${year}`,`${artist} ${singer} ${lw} movie songs ${year}`);
+    for(const seed of LANG_SEEDS[lang]||[])q.push(`${artist} ${singer} ${seed} ${year}`);
+  }else if(singer&&year){
+    q.push(`${singer} ${year}`,`${singer} songs ${year}`,`${singer} hits ${year}`,`${singer} ${langWords[0]} songs ${year}`,`${singer} ${langWords[0]} hits ${year}`,`${singer} movie songs ${year}`,`${singer} latest ${year}`,`${singer} top songs ${year}`,`${singer} melody ${year}`,`${singer} love songs ${year}`,`${singer} album ${year}`,`${singer} playlist ${year}`);
+    for(const lw of langWords)q.push(`${singer} ${lw} movie songs ${year}`,`${singer} ${lw} melody ${year}`,`${singer} ${lw} love songs ${year}`);
+    for(const seed of LANG_SEEDS[lang]||[])q.push(`${singer} ${seed} ${year}`,`${singer} ${seed} songs ${year}`);
+  }else if(singer){
+    q.push(`${singer}`,`${singer} songs`,`${singer} hits`,`${singer} ${langWords[0]} songs`,`${singer} latest`,`${singer} top songs`,`${singer} movie songs`,`${singer} melody`,`${singer} love songs`,`${singer} album hits`,`${singer} playlist`);
+    for(const lw of langWords)q.push(`${singer} ${lw} movie songs`,`${singer} ${lw} hits`,`${singer} ${lw} melody`);
+    for(const seed of LANG_SEEDS[lang]||[])q.push(`${singer} ${seed}`,`${singer} ${seed} songs`);
+  }else if(artist&&year){
+    q.push(`${artist} ${year}`,`${artist} songs ${year}`,`${artist} hits ${year}`,`${artist} ${langWords[0]} ${year}`,`${artist} latest ${year}`,`${artist} ${year} hits`,`${artist} movie songs ${year}`,`${artist} film songs ${year}`,`${artist} album ${year}`,`${artist} playlist ${year}`,`${artist} love songs ${year}`,`${artist} dance songs ${year}`,`${artist} melody ${year}`,`${artist} bgm songs ${year}`);
+    for(const lw of langWords){
+      q.push(`${artist} ${lw} songs ${year}`,`${artist} ${lw} movie songs ${year}`,`${artist} ${lw} hits ${year}`,`${artist} ${lw} film songs ${year}`,`${artist} ${lw} album ${year}`);
+    }
+    for(const seed of LANG_SEEDS[lang]||[]){
+      q.push(`${artist} ${seed} ${year}`,`${artist} ${seed} songs ${year}`);
+    }
+  }else if(artist){
+    q.push(artist,`${artist} ${langWords[0]}`,`${artist} songs`,`${artist} hits`,`${artist} ${langWords[0]} hits`,`${artist} new songs`,`${artist} latest`,`${artist} top songs`,`${artist} romantic`);
+  }else if(year){
+    for(const lw of langWords){
+      q.push(`${lw} ${year}`,`${lw} hits ${year}`,`${lw} songs ${year}`,`${lw} latest ${year}`,`${lw} top ${year}`,`${lw} ${year} hits`,`${lw} movies ${year}`,`${lw} movie songs ${year}`,`${lw} film songs ${year}`,`${lw} new ${year}`,`${lw} album ${year}`,`${lw} love songs ${year}`,`${lw} melody ${year}`,`${lw} dance songs ${year}`,`${lw} romantic songs ${year}`,`${lw} viral songs ${year}`,`${lw} playlist ${year}`);
+    }
+    for(const seed of LANG_SEEDS[lang]||[]){
+      q.push(`${seed} ${year}`,`${seed} songs ${year}`,`${seed} hits ${year}`);
+    }
+  }else{
+    for(const lw of langWords){
+      q.push(`${lw} ${currentYear} latest songs`,`${lw} latest songs ${currentYear}`,`${lw} new songs ${currentYear}`,`${lw} movie songs ${currentYear}`,`${lw} ${monthName()} ${currentYear} songs`,`${lw} trending today`,`${lw} viral songs today`,`${lw} top hits`,`${lw} new songs`,`${lw} popular`,`${lw} romantic`,`${lw} love songs`,`${lw} sad songs`,`${lw} melody`,`${lw} album hits`,`${lw} ${currentYear-1}`,`${lw} ${currentYear-2}`,`${lw} dance songs`,`${lw} party songs`,`${lw} movie songs`,`${lw} film songs`,`${lw} viral songs`,`${lw} playlist`,`${lw} best songs`,`${lw} superhit songs`);
+    }
+    for(const seed of LANG_SEEDS[lang]||[])q.push(`${seed} ${currentYear} songs`,`${seed} latest ${currentYear}`,`${seed} ${monthName()} ${currentYear}`,`${seed} trending today`,`${seed} songs`,`${seed} hits`,`${seed} top songs`,`${seed} movie songs`,`${seed} playlist`);
+  }
+  return rotateQueries(q);
+}
+async function loadMoreSongs(){
+  if(isLoadingMore)return;
+  isLoadingMore=true;
+  const btn=document.getElementById('load-more-btn');
+  const origLabel=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='Loading more…';}
+  const {year,artist,singer}=getHomeFilters();
+  const existingIds=new Set(homeAllSongs.map(s=>String(s.id||s.songid||s.media_url||'')));
+  let added=0;
+  let attempts=0;
+  while(added<25&&attempts<(singer?14:(year&&artist?12:10))){
+    const unused=generateExtraQueries(currentLang,year,artist,singer).filter(q=>!usedQueries.has(q));
+    if(!unused.length)break;
+    const batch=unused.slice(0,singer?12:(year&&artist?10:8));
+    batch.forEach(q=>usedQueries.add(q));
+    const fresh=await multiQuery(batch);
+    fresh.forEach(s=>{
+      const id=String(s.id||s.songid||s.media_url||'');
+      if(id&&!existingIds.has(id)){homeAllSongs.push(s);existingIds.add(id);added++;}
+    });
+    attempts++;
+  }
+  updateHomeDropdownsFromSongs(homeAllSongs);
+  // Restore filter values (updateDropdowns rebuilds the option list)
+  document.getElementById('home-year-select').value=year;
+  document.getElementById('home-hero-select').value=artist;
+  document.getElementById('home-singer-select').value=singer;
+  renderHomeFiltered();
+  if(added===0)showToast('No new songs from these searches — try another filter');
+  else showToast(`Added ${added} new songs`);
+  writeCachedSongs('home',currentLang,homeAllSongs);
+  isLoadingMore=false;
+}
+async function ensureFilteredSongs(minCount=20){
+  if(isLoadingMore)return;
+  let {year,artist,singer}=getHomeFilters();
+  if(!year&&!artist&&!singer){renderHomeFiltered();return;}
+  if(getFilteredHomeSongs(year,artist,singer).length>=minCount){renderHomeFiltered();return;}
+  isLoadingMore=true;
+  const c=document.getElementById('home-content');
+  c.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading matching songs...</div>';
+  let attempts=0;
+  while(getFilteredHomeSongs(year,artist,singer).length<minCount&&attempts<(singer?12:(year&&artist?10:6))){
+    const unused=generateExtraQueries(currentLang,year,artist,singer).filter(q=>!usedQueries.has(q));
+    if(!unused.length)break;
+    const batch=unused.slice(0,singer?10:(year&&artist?8:6));
+    batch.forEach(q=>usedQueries.add(q));
+    const fresh=await multiQuery(batch);
+    const existingIds=new Set(homeAllSongs.map(s=>String(s.id||s.songid||s.media_url||'')));
+    fresh.forEach(s=>{
+      const id=String(s.id||s.songid||s.media_url||'');
+      if(id&&!existingIds.has(id)){homeAllSongs.push(s);existingIds.add(id);}
+    });
+    attempts++;
+  }
+  updateHomeDropdownsFromSongs(homeAllSongs);
+  document.getElementById('home-year-select').value=year;
+  document.getElementById('home-hero-select').value=artist;
+  document.getElementById('home-singer-select').value=singer;
+  renderHomeFiltered();
+  isLoadingMore=false;
+}
+async function loadTrending(lang){
+  currentLang=lang;
+  usedQueries=new Set();
+  homeAllSongs=[];
+  document.querySelectorAll('.lang-pill').forEach(p=>p.classList.toggle('active',p.textContent.toLowerCase()===lang));
+  document.getElementById('home-year-select').value='';
+  document.getElementById('home-hero-select').value='';
+  document.getElementById('home-singer-select').value='';
+  const currentYear=new Date().getFullYear();
+  const langWords=LANG_TERMS[lang]||[lang];
+  const baseQueries=LANG_QUERIES[lang]||LANG_QUERIES.hindi;
+  const curatedLatest=Object.values(CURATED_YEAR_QUERIES[lang]||{}).flat();
+  const latestQueries=langWords.flatMap(lw=>[
+    `${lw} trending today`,
+    `${lw} viral songs today`,
+    `${lw} ${monthName()} ${currentYear} songs`,
+    `${lw} latest songs ${currentYear}`,
+    `${lw} new songs ${currentYear}`,
+    `${lw} movie songs ${currentYear}`,
+    `${lw} hits ${currentYear}`
+  ]);
+  const queries=rotateQueries([...curatedLatest,...latestQueries,...baseQueries]);
+  queries.forEach(q=>usedQueries.add(q));
+  const c=document.getElementById('home-content');
+  const cached=readCachedSongs('home',lang);
+  if(cached.length){
+    homeAllSongs=cached;
+    updateHomeDropdownsFromSongs(homeAllSongs);
+    renderHomeFiltered();
+  }else{
+    c.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading...</div>';
+  }
+  const firstBatch=queries.slice(0,2);
+  const remaining=queries.slice(2);
+  const firstSongs=await multiQuery(firstBatch);
+  if(currentLang!==lang)return;
+  homeAllSongs=mergeSongs(homeAllSongs,firstSongs);
+  updateHomeDropdownsFromSongs(homeAllSongs);
+  renderHomeFiltered();
+  writeCachedSongs('home',lang,homeAllSongs);
+  if(remaining.length){
+    multiQuery(remaining).then(extra=>{
+      if(currentLang!==lang||!extra.length)return;
+      homeAllSongs=mergeSongs(homeAllSongs,extra);
+      updateHomeDropdownsFromSongs(homeAllSongs);
+      renderHomeFiltered();
+      writeCachedSongs('home',lang,homeAllSongs);
+    }).catch(()=>{});
+  }
+}
+function generateSearchQueries(q){
+  const base=q.trim();
+  const lower=base.toLowerCase();
+  const lang=Object.keys(LANG_TERMS).find(key=>LANG_TERMS[key].some(term=>lower.includes(term)))||'';
+  const name=base.replace(/\b(songs?|music|hits?|movie|movies|film|films|audio|track|tracks|play|search|find|show|latest|top|best|all)\b/gi,' ').replace(/\s+/g,' ').trim();
+  const searchName=name||base;
+  const candidateLangs=lang?[lang]:Object.keys(LANG_TERMS).filter(key=>LANG_SEEDS[key]?.some(seed=>seed.toLowerCase().includes(searchName.toLowerCase())||searchName.toLowerCase().includes(seed.toLowerCase().split(' ')[0]))).slice(0,2);
+  if(!candidateLangs.length)candidateLangs.push('tamil','hindi','telugu');
+  const variants=[base,searchName,`${base} hits`,`${base} latest`,`${base} movie songs`,`${base} playlist`,`${base} top songs`,`${base} love songs`,`${base} melody`,`${base} dance songs`,`${base} 2024`,`${base} 2023`,`${base} 2022`,`${searchName} songs`,`${searchName} hits`,`${searchName} movie songs`,`${searchName} film songs`,`${searchName} album`,`${searchName} playlist`,`${searchName} love songs`,`${searchName} dance songs`,`${searchName} latest`,`${searchName} top songs`];
+  for(const key of candidateLangs){
+    const langWords=LANG_TERMS[key]||[key];
+    for(const lw of langWords)variants.push(`${searchName} ${lw} songs`,`${searchName} ${lw} hits`,`${searchName} ${lw} movie songs`,`${searchName} ${lw} film songs`,`${searchName} ${lw} album`,`${searchName} ${lw} playlist`);
+    for(const seed of LANG_SEEDS[key]||[])variants.push(`${searchName} ${seed}`,`${searchName} ${seed} songs`,`${seed} ${searchName}`,`${seed} ${searchName} songs`);
+  }
+  if(/vijay/i.test(searchName))variants.push('thalapathy vijay songs','vijay tamil songs','vijay movie songs','vijay anirudh songs','vijay ar rahman songs','vijay dance songs','vijay kuthu songs');
+  if(lang){
+    for(const seed of LANG_SEEDS[lang]||[])variants.push(`${seed} ${base}`,`${seed} songs`,`${seed} hits`);
+  }
+  return[...new Set(variants.map(x=>x.trim()).filter(Boolean))];
+}
+function renderSearchResults(){
+  const c=document.getElementById('search-results');
+  let h=searchSongs.length?'<ul class="song-list">':'';
+  uniqueSongs(searchSongs).forEach(s=>h+=songItemHtml(s));
+  h+=searchSongs.length?'</ul>':'';
+  if(searchSongs.length)h+=`<div style="text-align:center;color:var(--text2);font-size:.75rem;margin:4px 0 6px">Showing ${uniqueSongs(searchSongs).length} unique results</div>`;
+  h+=`<div class="load-more-wrap"><button id="search-load-more-btn" class="load-more-btn" onclick="loadMoreSearchResults()">🔍 Load more results</button></div>`;
+  c.innerHTML=h||'<div class="empty">No results found</div>';
+}
+async function doSearch(q){
+  searchQuery=q.trim();
+  searchSongs=[];
+  searchUsedQueries=new Set();
+  const c=document.getElementById('search-results');
+  c.innerHTML='<div class="loading"><span class="spinner"></span><br>Searching...</div>';
+  await loadMoreSearchResults();
+}
+async function loadMoreSearchResults(){
+  if(isSearchLoading||!searchQuery)return;
+  isSearchLoading=true;
+  const btn=document.getElementById('search-load-more-btn');
+  const origLabel=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='Loading more...';}
+  const existingIds=new Set(searchSongs.map(s=>String(s.id||s.songid||s.media_url||'')));
+  let added=0,attempts=0;
+  while(added<18&&attempts<6){
+    const unused=generateSearchQueries(searchQuery).filter(q=>!searchUsedQueries.has(q));
+    if(!unused.length)break;
+    const batch=unused.slice(0,8);
+    batch.forEach(q=>searchUsedQueries.add(q));
+    const fresh=await multiQuery(batch);
+    fresh.forEach(s=>{
+      const id=String(s.id||s.songid||s.media_url||'');
+      if(id&&!existingIds.has(id)){searchSongs.push(s);existingIds.add(id);added++;}
+    });
+    attempts++;
+  }
+  renderSearchResults();
+  if(btn){btn.disabled=false;btn.textContent=origLabel;}
+  if(added===0&&searchSongs.length)showToast('No more search results found');
+  isSearchLoading=false;
+}
+function addToQueue(id){const s=songCache[id];if(!s)return;queue.push(s);updateQueueUI()}
+function updateQueueUI(){document.getElementById('queue-count').textContent=queue.length;const c=document.getElementById('queue-content');if(!queue.length){c.innerHTML='<div class="empty">Queue is empty</div>';return;}let h='<ul class="song-list">';queue.forEach((s,i)=>h+=`<li class="song-item" onclick="playQueueIndex(${i})"><img class="s-art" src="${esc(s.image)}"><div class="s-info"><div class="s-title">${esc(s.name)}</div><div class="s-artist">${esc(s.artist)}</div></div></li>`);h+='</ul>';c.innerHTML=h}
+function playQueueIndex(i){queueIndex=i;playCurrent()}
+function songsFromListItem(item){
+  const list=item?.closest('.song-list');
+  if(!list)return[];
+  return[...list.querySelectorAll('[data-song-id]')].map(el=>songCache[el.dataset.songId]).filter(s=>s&&s.url);
+}
+function playSong(id,item){
+  const s=songCache[id];
+  if(!s||!s.url){showToast('No playback URL for this track');return;}
+  const listQueue=songsFromListItem(item);
+  if(listQueue.length){
+    queue=listQueue;
+    queueIndex=queue.findIndex(x=>x.id===id);
+  }else{
+    const idx=queue.findIndex(x=>x.id===id);
+    if(idx<0){queue.push(s);queueIndex=queue.length-1}else queueIndex=idx;
+  }
+  updateQueueUI();return playCurrent()
+}
+function stopSongVideo(){
+  if(!songVideo||!songVideoBackdrop)return;
+  songVideo.pause();
+  songVideo.removeAttribute('src');
+  songVideo.load();
+  songVideoBackdrop.classList.remove('active');
+}
+function stopYouTubeVideo(){
+  videoSidePanel?.classList.remove('active','preloaded');
+  document.body.classList.remove('video-mode');
+  stopYouTubeTimeTracking();
+  if(youtubeVideoFrame)youtubeVideoFrame.src='';
+  document.getElementById('btn-video')?.classList.remove('active');
+}
+window.addEventListener('message',event=>{
+  if(event.origin!=='https://www.youtube.com'||typeof event.data!=='string')return;
+  try{
+    const data=JSON.parse(event.data);
+    const info=data.info;
+    if(data.event==='infoDelivery'&&info&&typeof info.currentTime==='number'){
+      syncAudioToVideo(info.currentTime);
+    }
+    if((data.event==='onStateChange'&&data.info===0)||(info&&info.playerState===0)){
+      nextVideoTrack();
+    }
+    if(data.event==='onReady')registerYouTubeListener();
+  }catch(_){}
+});
+function updateSongVideo(song){
+  if(!songVideo||!songVideoBackdrop)return;
+  const videoUrl=song?.videoUrl||'';
+  document.getElementById('btn-video')?.classList.toggle('active',Boolean(videoUrl));
+  if(!videoUrl){stopSongVideo();return;}
+  if(songVideo.src!==videoUrl){
+    songVideo.src=videoUrl;
+    songVideo.load();
+  }
+  songVideoBackdrop.classList.add('active');
+  if(!audio.paused)songVideo.play().catch(()=>{});
+}
+function videoSearchQuery(song){
+  return `${song.name} ${song.artist} official video song`.replace(/\s+/g,' ').trim();
+}
+function youtubeEmbedUrl(videoId){
+  const origin=encodeURIComponent(location.origin);
+  return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&playsinline=1&rel=0&modestbranding=1&controls=1&enablejsapi=1&hd=1&vq=hd1080&origin=${origin}`;
+}
+function sendYouTubeCommand(func,args=[]){
+  const win=youtubeVideoFrame?.contentWindow;
+  if(!win)return;
+  win.postMessage(JSON.stringify({event:'command',func,args}),'https://www.youtube.com');
+}
+function registerYouTubeListener(){
+  const win=youtubeVideoFrame?.contentWindow;
+  if(!win)return;
+  win.postMessage(JSON.stringify({event:'listening',id:'spotifyaudio-video'}),'https://www.youtube.com');
+  sendYouTubeCommand('addEventListener',['onStateChange']);
+  sendYouTubeCommand('addEventListener',['onReady']);
+}
+function startYouTubeTimeTracking(){
+  clearInterval(youtubeListenTimer);
+  registerYouTubeListener();
+  youtubeListenTimer=setInterval(()=>{
+    if(!videoSidePanel?.classList.contains('active'))return;
+    registerYouTubeListener();
+  },1000);
+}
+function stopYouTubeTimeTracking(){
+  clearInterval(youtubeListenTimer);
+  youtubeListenTimer=null;
+}
+function syncVideoToAudio(force=false){
+  if(!youtubeVideoFrame?.src||!audio.duration)return;
+  const now=Date.now();
+  if(!force&&now-lastVideoSyncAt<3500)return;
+  lastVideoSyncAt=now;
+  sendYouTubeCommand('seekTo',[Math.max(0,audio.currentTime||0),true]);
+  sendYouTubeCommand('playVideo');
+}
+function requestYouTubeHd(){
+  ['highres','hd2160','hd1440','hd1080','hd720'].forEach((quality,i)=>{
+    setTimeout(()=>sendYouTubeCommand('setPlaybackQuality',[quality]),i*180);
+  });
+}
+function muteAudioForVideo(){
+  if(audioMutedForVideo)return;
+  audioMuteBeforeVideo=audio.muted;
+  audioMutedForVideo=true;
+  audio.muted=true;
+}
+function unmuteAudioAfterVideo(){
+  if(!audioMutedForVideo)return;
+  audio.muted=audioMuteBeforeVideo;
+  audioMutedForVideo=false;
+}
+function syncAudioToVideo(seconds){
+  if(!videoSidePanel?.classList.contains('active')||!audio.duration||!isFinite(seconds))return;
+  latestYouTubeTime=seconds;
+  const now=Date.now();
+  if(now-lastYouTubeTimeSyncAt<700)return;
+  if(Math.abs((audio.currentTime||0)-seconds)<1.25)return;
+  lastYouTubeTimeSyncAt=now;
+  ignoreSeekUntil=Date.now()+1000;
+  audio.currentTime=Math.max(0,Math.min(audio.duration,seconds));
+}
+function bestVideoFromResults(videos){
+  return videos.find(v=>/official|video|song/i.test(v.title||''))||videos[0]||null;
+}
+async function findSongVideo(song){
+  const key=song.id||videoSearchQuery(song);
+  if(videoResultCache.has(key))return videoResultCache.get(key);
+  if(videoResultPending.has(key))return videoResultPending.get(key);
+  const pending=(async()=>{
+    const res=await fetch('/api/video/search?q='+encodeURIComponent(videoSearchQuery(song)));
+    if(!res.ok)throw new Error('video search failed');
+    const json=await res.json();
+    const picked=bestVideoFromResults(json.videos||[]);
+    videoResultCache.set(key,picked);
+    videoResultPending.delete(key);
+    return picked;
+  })().catch(e=>{videoResultPending.delete(key);throw e;});
+  videoResultPending.set(key,pending);
+  return pending;
+}
+function preloadSongVideo(song){
+  if(!song?.id)return;
+  findSongVideo(song).then(video=>{
+    if(!video?.id||queue[queueIndex]?.id!==song.id)return;
+    const nextSrc=youtubeEmbedUrl(video.id);
+    if(youtubeVideoFrame.src!==nextSrc)youtubeVideoFrame.src=nextSrc;
+    youtubeVideoFrame.onload=()=>syncVideoToAudio(true);
+    videoSidePanel?.classList.add('preloaded');
+    document.getElementById('video-panel-title').textContent=video.title||song.name||'Music video';
+    document.getElementById('video-song-name').textContent=video.title||song.name||'Music video';
+    document.getElementById('video-song-artist').textContent=song.artist||'';
+  }).catch(()=>{});
+}
+function preloadNeighborVideos(){
+  if(!queue.length||queueIndex<0)return;
+  const next=queue[(queueIndex+1)%queue.length];
+  const prev=queue[(queueIndex-1+queue.length)%queue.length];
+  if(next)findSongVideo(next).catch(()=>{});
+  if(prev&&prev.id!==next?.id)findSongVideo(prev).catch(()=>{});
+}
+function openVideoPanel(song){
+  stopSongVideo();
+  muteAudioForVideo();
+  videoSidePanel.classList.remove('preloaded');
+  videoSidePanel.classList.add('active');
+  document.body.classList.add('video-mode');
+  if(!youtubeVideoFrame.src){
+    document.getElementById('video-panel-title').textContent=song.name||'Music video';
+    document.getElementById('video-song-name').textContent='Finding music video...';
+  }
+  document.getElementById('video-song-artist').textContent=song.artist||'';
+  document.getElementById('btn-video')?.classList.add('active');
+  requestVideoFullscreen();
+}
+function requestVideoFullscreen(){
+  if(!videoSidePanel||document.fullscreenElement)return;
+  const request=videoSidePanel.requestFullscreen||
+    videoSidePanel.webkitRequestFullscreen||
+    videoSidePanel.msRequestFullscreen;
+  if(request)request.call(videoSidePanel).catch?.(()=>{});
+}
+function playYouTubeVideo(video){
+  if(!video?.id){showToast('No video found for this song');return;}
+  const song=queue[queueIndex]||{};
+  if(!videoSidePanel.classList.contains('active'))openVideoPanel(song);
+  videoSidePanel.classList.remove('preloaded');
+  const nextSrc=youtubeEmbedUrl(video.id);
+  if(youtubeVideoFrame.src!==nextSrc)youtubeVideoFrame.src=nextSrc;
+  youtubeVideoFrame.onload=()=>syncVideoToAudio(true);
+  document.getElementById('video-panel-title').textContent=video.title||song.name||'Music video';
+  document.getElementById('video-song-name').textContent=video.title||song.name||'Music video';
+  document.getElementById('video-song-artist').textContent=song.artist||'';
+  startYouTubeTimeTracking();
+  requestYouTubeHd();
+  setTimeout(()=>syncVideoToAudio(true),250);
+  setTimeout(()=>syncVideoToAudio(true),900);
+  setTimeout(()=>requestYouTubeHd(),1400);
+  setTimeout(()=>startYouTubeTimeTracking(),1000);
+  preloadNeighborVideos();
+  showToast(video.title?`Playing video: ${video.title}`:'Playing video');
+}
+window.switchToAudio=async function(){
+  if(audio.duration&&latestYouTubeTime>0){
+    ignoreSeekUntil=Date.now()+1200;
+    audio.currentTime=Math.max(0,Math.min(audio.duration,latestYouTubeTime));
+  }
+  stopYouTubeVideo();
+  if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+  unmuteAudioAfterVideo();
+  try{
+    if(audio.src&&audio.paused)await audio.play();
+    document.getElementById('btn-play').textContent='⏸';
+    if('mediaSession'in navigator)navigator.mediaSession.playbackState='playing';
+  }catch(e){
+    console.warn('audio resume after video failed',e?.message);
+    showToast('Tap play to resume audio');
+  }
+};
+window.playCurrentSongVideo=async function(){
+  if(queueIndex<0||queueIndex>=queue.length){showToast('Play a song first');return;}
+  const song=queue[queueIndex];
+  const btn=document.getElementById('btn-video');
+  const oldLabel=btn?.textContent||'VIDEO';
+  const cached=videoResultCache.get(song.id||videoSearchQuery(song));
+  openVideoPanel(song);
+  if(cached){
+    playYouTubeVideo(cached);
+    return;
+  }
+  if(btn){btn.textContent='FIND';btn.disabled=true;}
+  try{
+    const picked=await findSongVideo(song);
+    playYouTubeVideo(picked);
+  }catch(e){
+    console.warn('video search failed',e?.message);
+    showToast('Could not find video automatically');
+  }finally{
+    if(btn){btn.textContent=oldLabel;btn.disabled=false;}
+  }
+};
+async function playVideoQueueIndex(i){
+  if(!queue.length)return;
+  queueIndex=(i+queue.length)%queue.length;
+  const song=queue[queueIndex];
+  if(!song?.url){showToast('No playback URL');return;}
+  muteAudioForVideo();
+  ignoreSeekUntil=Date.now()+1200;
+  const cachedVideo=videoResultCache.get(song.id||videoSearchQuery(song));
+  document.getElementById('now-playing').style.display='block';
+  document.getElementById('np-art').src=song.image;
+  document.getElementById('np-title').textContent=song.name;
+  document.getElementById('np-artist').textContent=song.artist;
+  updateMediaSession(song);
+  if(audio.src!==song.url){
+    audio.src=song.url;
+    audio.currentTime=0;
+    audio.load();
+  }
+  document.getElementById('btn-play').textContent='⏸';
+  openVideoPanel(song);
+  if(cachedVideo){
+    playYouTubeVideo(cachedVideo);
+    audio.play().catch(()=>{});
+    preloadNeighborVideos();
+    return;
+  }
+  audio.play().catch(()=>{});
+  try{
+    const video=await findSongVideo(song);
+    playYouTubeVideo(video);
+  }catch(e){
+    console.warn('next video search failed',e?.message);
+    showToast('Could not find video for next song');
+  }
+}
+window.nextVideoTrack=function(){
+  if(!queue.length)return;
+  return playVideoQueueIndex(queueIndex+1);
+};
+window.prevVideoTrack=function(){
+  if(!queue.length)return;
+  return playVideoQueueIndex(queueIndex-1);
+};
+window.setSongVideo=function(songKey,videoUrl){
+  const custom=readCustomVideoBackgrounds();
+  if(videoUrl)custom[songKey]=videoUrl;
+  else delete custom[songKey];
+  localStorage.setItem('spotifyaudio:video-backgrounds',JSON.stringify(custom));
+  Object.keys(songCache).forEach(id=>{
+    const s=songCache[id];
+    if(!s)return;
+    s.videoUrl=videoUrlForSong(s,id,s.name,s.artist);
+  });
+  showToast('Video background saved. Reload the list or play the song again.');
+};
+function currentSongVideoKey(song){return `${song.name} - ${song.artist}`}
+function selectCurrentSongVideoFile(){
+  if(!songVideoFile)return;
+  songVideoFile.value='';
+  songVideoFile.click();
+}
+window.editCurrentSongVideo=function(){
+  if(queueIndex<0||queueIndex>=queue.length){showToast('Play a song first');return;}
+  const song=queue[queueIndex];
+  const choice=prompt('Type 1 to choose a video from this device. Or paste a direct .mp4/.webm URL. Type remove to clear video.','1');
+  if(choice===null)return;
+  const cleaned=choice.trim();
+  if(cleaned==='1'){selectCurrentSongVideoFile();return;}
+  if(cleaned.toLowerCase()==='remove'||cleaned===''){
+    song.videoUrl='';
+    window.setSongVideo(currentSongVideoKey(song),'');
+    updateSongVideo(song);
+    showToast('Video removed for this song');
+    return;
+  }
+  song.videoUrl=cleaned;
+  window.setSongVideo(currentSongVideoKey(song),cleaned);
+  updateSongVideo(song);
+  showToast('Video added for this song');
+};
+async function playCurrent(){
+  if(queueIndex<0||queueIndex>=queue.length)return;
+  const s=queue[queueIndex];
+  if(!s.url){showToast('No playback URL');return;}
+  try{
+    stopYouTubeVideo();
+    ignoreSeekUntil=Date.now()+1200;
+    document.getElementById('now-playing').style.display='block';
+    document.getElementById('np-art').src=s.image;
+    document.getElementById('np-title').textContent=s.name;
+    document.getElementById('np-artist').textContent=s.artist;
+    updateSongVideo(s);
+    updateMediaSession(s);
+    if(audio.src!==s.url){
+      audio.src=s.url;
+      audio.currentTime=0;
+      audio.load();
+    }
+    await audio.play();
+    preloadSongVideo(s);
+    preloadNeighborVideos();
+  }catch(e){console.warn('play failed',e?.message);showToast('Playback blocked — tap play button');return;}
+  document.getElementById('btn-play').textContent='⏸';
+  if('mediaSession'in navigator)navigator.mediaSession.playbackState='playing';
+}
+async function reloadCurrentAt(seconds){
+  if(queueIndex<0||queueIndex>=queue.length)return;
+  const s=queue[queueIndex];
+  if(!s?.url)return;
+  try{
+    ignoreSeekUntil=Date.now()+1500;
+    audio.src='';
+    audio.load();
+    audio.src=s.url;
+    audio.load();
+    const applyTime=()=>{try{audio.currentTime=Math.max(0,seconds||0)}catch(_){}};
+    if(audio.readyState>=1)applyTime();
+    else audio.addEventListener('loadedmetadata',applyTime,{once:true});
+    await audio.play();
+    document.getElementById('btn-play').textContent='⏸';
+    if('mediaSession'in navigator)navigator.mediaSession.playbackState='playing';
+  }catch(e){console.warn('reload resume failed',e?.message);showToast('Tap play again to resume');}
+}
+async function recoverHiddenResume(){
+  if(recoveringLockScreenAudio)return;
+  recoveringLockScreenAudio=true;
+  try{
+    await reloadCurrentAt(lastPausedAt||audio.currentTime||0);
+  }finally{
+    pausedWhileHidden=false;
+    setTimeout(()=>{recoveringLockScreenAudio=false},800);
+  }
+}
+async function resumeFromLockScreen(){
+  const startAt=lastPausedAt||audio.currentTime||0;
+  if(!audio.src&&queueIndex>=0)return playCurrent();
+  return reloadCurrentAt(startAt);
+}
+async function lockScreenPlay(){
+  lockScreenMuted=false;
+  audio.muted=false;
+  audio.volume=lastVolume||1;
+  document.getElementById('btn-play').textContent='⏸';
+  if('mediaSession'in navigator)navigator.mediaSession.playbackState='playing';
+  if(audio.paused)return resumePlayback();
+}
+async function lockScreenPause(){
+  lastPausedAt=audio.currentTime||lastPausedAt;
+  lastVolume=audio.volume||1;
+  lockScreenMuted=true;
+  audio.muted=true;
+  document.getElementById('btn-play').textContent='▶';
+  if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused';
+}
+function watchResumeProgress(startAt){
+  clearTimeout(resumeWatchTimer);
+  resumeWatchTimer=setTimeout(()=>{
+    if(audio.paused)return;
+    if(audio.currentTime<=startAt+.25)reloadCurrentAt(startAt);
+  },1400);
+}
+async function resumePlayback(){
+  try{
+    lockScreenMuted=false;
+    audio.muted=false;
+    audio.volume=lastVolume||1;
+    if(!audio.src&&queueIndex>=0)return playCurrent();
+    const startAt=lastPausedAt||audio.currentTime||0;
+    if(audio.paused)await audio.play();
+    document.getElementById('btn-play').textContent='⏸';
+    if('mediaSession'in navigator)navigator.mediaSession.playbackState='playing';
+    watchResumeProgress(startAt);
+  }catch(e){console.warn('resume failed',e?.message);showToast('Playback blocked — tap play button');}
+}
+function pausePlayback(){
+  lockScreenMuted=false;
+  audio.muted=false;
+  lastPausedAt=audio.currentTime||lastPausedAt;
+  clearTimeout(resumeWatchTimer);
+  if(!audio.paused)audio.pause();
+  document.getElementById('btn-play').textContent='▶';
+  if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused';
+}
+function togglePlay(){if(audio.paused)resumePlayback();else pausePlayback()}
+async function nextTrack(){if(!queue.length)return;queueIndex=(queueIndex+1)%queue.length;return playCurrent()}
+async function prevTrack(){if(!queue.length)return;queueIndex=(queueIndex-1+queue.length)%queue.length;return playCurrent()}
+function seekBy(seconds){if(!audio.duration)return;ignoreSeekUntil=Date.now()+1200;audio.currentTime=Math.max(0,Math.min(audio.duration,audio.currentTime+seconds));syncVideoToAudio(true)}
+function rewindTrack(){seekBy(-10)}
+function forwardTrack(){seekBy(10)}
+function seekTo(e){if(!audio.duration)return;const r=e.currentTarget.getBoundingClientRect();ignoreSeekUntil=Date.now()+1200;audio.currentTime=((e.clientX-r.left)/r.width)*audio.duration;syncVideoToAudio(true)}
+function handleExternalSeek(){
+  if(Date.now()<ignoreSeekUntil||queue.length<2)return;
+  const delta=audio.currentTime-lastAudioTime;
+  if(delta>3){ignoreSeekUntil=Date.now()+1200;nextTrack()}
+  else if(delta<-3){ignoreSeekUntil=Date.now()+1200;prevTrack()}
+}
+function registerServiceWorker(){
+  if(!('serviceWorker' in navigator))return;
+  let refreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(refreshing)return;
+    refreshing=true;
+    window.location.reload();
+  });
+  window.addEventListener('load',async()=>{
+    try{
+      const reg=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});
+      const activateNewWorker=worker=>worker&&worker.postMessage({type:'SKIP_WAITING'});
+      if(reg.waiting)activateNewWorker(reg.waiting);
+      reg.addEventListener('updatefound',()=>{
+        const worker=reg.installing;
+        if(!worker)return;
+        worker.addEventListener('statechange',()=>{
+          if(worker.state==='installed'&&navigator.serviceWorker.controller)activateNewWorker(worker);
+        });
+      });
+      setInterval(()=>reg.update().catch(()=>{}),60*60*1000);
+    }catch(_){}
+  });
+}
+function toggleMic(){
+  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const mic=document.getElementById('mic-btn');
+  if(!SpeechRecognition){showToast('Voice search is not supported on this browser');return;}
+  if(isListening&&recognition){recognition.stop();return;}
+  recognition=new SpeechRecognition();
+  recognition.lang='en-US';
+  recognition.interimResults=false;
+  recognition.maxAlternatives=1;
+  isListening=true;
+  mic.classList.add('listening');
+  showToast('Listening...');
+  recognition.onresult=e=>{
+    const transcript=(e.results?.[0]?.[0]?.transcript||'').trim();
+    if(!transcript)return;
+    const input=document.getElementById('search-input');
+    input.value=transcript;
+    showTab('search');
+    clearTimeout(searchTimeout);
+    doSearch(transcript);
+  };
+  recognition.onerror=e=>{
+    const code=e.error||'error';
+    if(code==='not-allowed'||code==='service-not-allowed')showToast('Microphone permission denied');
+    else if(code==='no-speech')showToast('No speech detected');
+    else showToast('Voice search failed');
+  };
+  recognition.onend=()=>{
+    isListening=false;
+    mic.classList.remove('listening');
+  };
+  try{recognition.start()}catch(_){isListening=false;mic.classList.remove('listening');}
+}
+function updatePartyDropdownsFromSongs(songs){
+  const yearSel=document.getElementById('party-year-select');
+  const artistSel=document.getElementById('party-hero-select');
+  const singerSel=document.getElementById('party-singer-select');
+  const selectedYear=yearSel.value.trim();
+  const selectedArtist=artistSel.value.trim();
+  const selectedSinger=singerSel.value.trim();
+  const norm=songs.map(normalizeSong);
+  const years=[...new Set([...yearOptions(),...norm.map(s=>s.year).filter(Boolean),selectedYear].filter(Boolean))].sort((a,b)=>Number(b)-Number(a));
+  const artists=[...new Set([...norm.flatMap(s=>s.actorsList).filter(Boolean),selectedArtist].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const singers=[...new Set([...norm.flatMap(s=>s.singersList).filter(Boolean),selectedSinger].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  yearSel.innerHTML='<option value="">All</option>'+years.map(y=>`<option value="${esc(y)}">${esc(y)}</option>`).join('');
+  artistSel.innerHTML='<option value="">All</option>'+artists.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  singerSel.innerHTML='<option value="">All</option>'+singers.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  yearSel.value=selectedYear;
+  artistSel.value=selectedArtist;
+  singerSel.value=selectedSinger;
+}
+function getPartyFilters(){
+  return{
+    year:document.getElementById('party-year-select').value.trim(),
+    artist:document.getElementById('party-hero-select').value.trim(),
+    singer:document.getElementById('party-singer-select').value.trim()
+  };
+}
+function getFilteredPartySongs(year,artist,singer=''){
+  let filtered=partyAllSongs;
+  if(year)filtered=filtered.filter(s=>normalizeSong(s).year===year);
+  if(artist)filtered=filtered.filter(s=>artistMatchesSong(s,artist));
+  if(singer)filtered=filtered.filter(s=>singerMatchesSong(s,singer));
+  return filtered;
+}
+function renderPartyFiltered(){
+  const {year,artist,singer}=getPartyFilters();
+  const filtered=uniqueSongs(getFilteredPartySongs(year,artist,singer));
+  const c=document.getElementById('party-content');
+  let html='';
+  if(filtered.length){
+    html+='<ul class="song-list">';filtered.forEach(s=>html+=songItemHtml(s));html+='</ul>';
+    html+=`<div style="text-align:center;color:var(--text2);font-size:.75rem;margin:4px 0 6px">Showing ${filtered.length} of ${partyAllSongs.length} loaded</div>`;
+  }else{
+    html+='<div class="empty"><div class="icon">🎉</div><div class="msg">No party songs match these filters yet<br><span style="font-size:.75rem">Click below to fetch more</span></div></div>';
+  }
+  let label='🎉 Load more party songs';
+  if(year&&artist&&singer)label=`🎉 Load more ${artist} ${singer} ${year} party songs`;
+  else if(year&&singer)label=`🎉 Load more ${singer} ${year} party songs`;
+  else if(artist&&singer)label=`🎉 Load more ${artist} ${singer} party songs`;
+  else if(year&&artist)label=`🎉 Load more ${artist} ${year} party songs`;
+  else if(year)label=`🎉 Load more ${currentPartyLang} ${year} party songs`;
+  else if(artist)label=`🎉 Load more ${artist} party songs`;
+  else if(singer)label=`🎉 Load more ${singer} party songs`;
+  else label=`🎉 Load more ${currentPartyLang} party songs`;
+  html+=`<div class="load-more-wrap"><button id="party-load-more-btn" class="load-more-btn" onclick="loadMorePartySongs()">${esc(label)}</button></div>`;
+  c.innerHTML=html;
+}
+function generatePartyQueries(lang,year,artist,singer=''){
+  const langWords=LANG_TERMS[lang]||[lang];
+  const seeds=LANG_SEEDS[lang]||[];
+  const q=[...(PARTY_QUERIES[lang]||[])];
+  const partyTerms=['party','dance','club','dj','remix','mass','kuthu','fast beat','celebration'];
+  if(singer&&artist&&year){
+    q.push(`${artist} ${singer} party songs ${year}`,`${artist} ${singer} dance songs ${year}`,`${artist} ${singer} hits ${year}`);
+    for(const seed of seeds)q.push(`${artist} ${singer} ${seed} party ${year}`);
+  }else if(singer&&year){
+    q.push(`${singer} party songs ${year}`,`${singer} dance songs ${year}`,`${singer} hits ${year}`,`${singer} ${langWords[0]} party ${year}`);
+    for(const lw of langWords)for(const term of partyTerms)q.push(`${singer} ${lw} ${term} songs ${year}`);
+    for(const seed of seeds)q.push(`${singer} ${seed} party ${year}`,`${singer} ${seed} dance ${year}`);
+  }else if(singer){
+    q.push(`${singer} party songs`,`${singer} dance songs`,`${singer} hits`,`${singer} remix`,`${singer} ${langWords[0]} dance`);
+    for(const lw of langWords)for(const term of partyTerms)q.push(`${singer} ${lw} ${term} songs`);
+    for(const seed of seeds)q.push(`${singer} ${seed} party songs`,`${singer} ${seed} dance songs`);
+  }else if(artist&&year){
+    q.push(`${artist} ${year}`,`${artist} party songs ${year}`,`${artist} dance songs ${year}`,`${artist} hits ${year}`,`${artist} movie songs ${year}`);
+    for(const lw of langWords)for(const term of partyTerms)q.push(`${artist} ${lw} ${term} songs ${year}`);
+    for(const seed of seeds)q.push(`${artist} ${seed} party ${year}`,`${artist} ${seed} dance ${year}`);
+  }else if(artist){
+    q.push(`${artist} party songs`,`${artist} dance songs`,`${artist} hits`,`${artist} remix`,`${artist} mass songs`);
+    for(const lw of langWords)q.push(`${artist} ${lw} party`,`${artist} ${lw} dance songs`);
+  }else if(year){
+    for(const lw of langWords)for(const term of partyTerms)q.push(`${lw} ${term} songs ${year}`,`${lw} ${term} hits ${year}`);
+    for(const seed of seeds)q.push(`${seed} party ${year}`,`${seed} dance ${year}`,`${seed} hits ${year}`);
+  }else{
+    for(const lw of langWords)for(const term of partyTerms)q.push(`${lw} ${term} songs`,`${lw} ${term} hits`);
+    seeds.forEach(seed=>q.push(`${seed} party songs`,`${seed} dance songs`));
+    if(lang==='english'){
+      ENGLISH_PARTY_ARTISTS.forEach(name=>{
+        q.push(`${name} party songs`,`${name} dance hits`,`${name} club songs`,`${name} greatest hits`,`${name} album songs`,`${name} playlist`,`${name} top songs`,`${name} remix songs`);
+      });
+    }
+  }
+  return[...new Set(q.map(x=>x.trim()).filter(Boolean))];
+}
+async function loadPartyLang(lang){
+  currentPartyLang=lang;
+  partyUsedQueries=new Set();
+  partyAllSongs=[];
+  partyInitialized=true;
+  document.querySelectorAll('#party-lang-pills .lang-pill').forEach(p=>p.classList.toggle('active',p.textContent.toLowerCase()===lang));
+  document.getElementById('party-year-select').value='';
+  document.getElementById('party-hero-select').value='';
+  document.getElementById('party-singer-select').value='';
+  const c=document.getElementById('party-content');
+  const cached=readCachedSongs('party',lang);
+  if(cached.length){
+    partyAllSongs=cached;
+    updatePartyDropdownsFromSongs(partyAllSongs);
+    renderPartyFiltered();
+  }else{
+    c.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading party songs...</div>';
+  }
+  const queries=generatePartyQueries(lang,'','').slice(0,8);
+  queries.forEach(q=>partyUsedQueries.add(q));
+  const firstSongs=await multiQuery(queries.slice(0,2));
+  if(currentPartyLang!==lang)return;
+  partyAllSongs=mergeSongs(partyAllSongs,firstSongs);
+  updatePartyDropdownsFromSongs(partyAllSongs);
+  renderPartyFiltered();
+  writeCachedSongs('party',lang,partyAllSongs);
+  const remaining=queries.slice(2);
+  if(remaining.length){
+    multiQuery(remaining).then(extra=>{
+      if(currentPartyLang!==lang||!extra.length)return;
+      partyAllSongs=mergeSongs(partyAllSongs,extra);
+      updatePartyDropdownsFromSongs(partyAllSongs);
+      renderPartyFiltered();
+      writeCachedSongs('party',lang,partyAllSongs);
+    }).catch(()=>{});
+  }
+}
+async function loadMorePartySongs(){
+  if(isPartyLoading)return;
+  isPartyLoading=true;
+  const btn=document.getElementById('party-load-more-btn');
+  const origLabel=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='Loading more...';}
+  const {year,artist,singer}=getPartyFilters();
+  const existingIds=new Set(partyAllSongs.map(s=>String(s.id||s.songid||s.media_url||'')));
+  let added=0,attempts=0;
+  while(added<10&&attempts<(singer?10:(year&&artist?8:4))){
+    const unused=generatePartyQueries(currentPartyLang,year,artist,singer).filter(q=>!partyUsedQueries.has(q));
+    if(!unused.length)break;
+    const batch=unused.slice(0,singer?10:(year&&artist?8:6));
+    batch.forEach(q=>partyUsedQueries.add(q));
+    const fresh=await multiQuery(batch);
+    fresh.forEach(s=>{
+      const id=String(s.id||s.songid||s.media_url||'');
+      if(id&&!existingIds.has(id)){partyAllSongs.push(s);existingIds.add(id);added++;}
+    });
+    attempts++;
+  }
+  updatePartyDropdownsFromSongs(partyAllSongs);
+  document.getElementById('party-year-select').value=year;
+  document.getElementById('party-hero-select').value=artist;
+  document.getElementById('party-singer-select').value=singer;
+  renderPartyFiltered();
+  if(added===0)showToast('No new party songs from these searches');
+  else showToast(`Added ${added} party songs`);
+  if(btn){btn.disabled=false;btn.textContent=origLabel;}
+  isPartyLoading=false;
+}
+async function ensurePartyFilteredSongs(minCount=20){
+  if(isPartyLoading)return;
+  const {year,artist,singer}=getPartyFilters();
+  if(!year&&!artist&&!singer){renderPartyFiltered();return;}
+  if(getFilteredPartySongs(year,artist,singer).length>=minCount){renderPartyFiltered();return;}
+  isPartyLoading=true;
+  document.getElementById('party-content').innerHTML='<div class="loading"><span class="spinner"></span><br>Loading matching party songs...</div>';
+  let attempts=0;
+  while(getFilteredPartySongs(year,artist,singer).length<minCount&&attempts<(singer?12:(year&&artist?10:6))){
+    const unused=generatePartyQueries(currentPartyLang,year,artist,singer).filter(q=>!partyUsedQueries.has(q));
+    if(!unused.length)break;
+    const batch=unused.slice(0,singer?10:(year&&artist?8:6));
+    batch.forEach(q=>partyUsedQueries.add(q));
+    const fresh=await multiQuery(batch);
+    const existingIds=new Set(partyAllSongs.map(s=>String(s.id||s.songid||s.media_url||'')));
+    fresh.forEach(s=>{
+      const id=String(s.id||s.songid||s.media_url||'');
+      if(id&&!existingIds.has(id)){partyAllSongs.push(s);existingIds.add(id);}
+    });
+    attempts++;
+  }
+  updatePartyDropdownsFromSongs(partyAllSongs);
+  document.getElementById('party-year-select').value=year;
+  document.getElementById('party-hero-select').value=artist;
+  document.getElementById('party-singer-select').value=singer;
+  renderPartyFiltered();
+  isPartyLoading=false;
+}
+async function loadParty(){if(!partyInitialized)await loadPartyLang(currentPartyLang);else renderPartyFiltered();}
+function languageOptionsHtml(selected){return LANGUAGE_OPTIONS.map(([value,label])=>`<option value="${esc(value)}"${value===selected?' selected':''}>${esc(label)}</option>`).join('')}
+function localizedQueries(queries,lang){const label=(LANGUAGE_OPTIONS.find(([value])=>value===lang)||['',lang])[1];return queries.map(q=>`${label} ${q}`)}
+function categoryQueryVariants(item,lang,type){
+  const label=(LANGUAGE_OPTIONS.find(([value])=>value===lang)||['',lang])[1];
+  const name=item.name.replace(/^All\s+/i,'').trim();
+  const seeds=item.queries||[];
+  const suffixes=type==='kids'
+    ? ['songs','rhymes','nursery rhymes','kids songs','baby songs','learning songs','cartoon songs','playlist','popular','latest','dance songs','bedtime songs']
+    : ['bhajan','aarti','songs','devotional songs','mantra','stotram','chalisa','playlist','popular bhajans','morning bhajan','latest bhajan','temple songs'];
+  const q=[...localizedQueries(seeds,lang)];
+  q.push(`${label} ${name} ${type==='kids'?'kids songs':'bhajan'}`,`${label} ${name} ${type==='kids'?'rhymes':'devotional songs'}`,`${label} ${name} playlist`,`${label} ${name} popular songs`);
+  for(const seed of seeds){
+    for(const suffix of suffixes)q.push(`${label} ${seed} ${suffix}`);
+  }
+  for(const suffix of suffixes)q.push(`${label} ${name} ${suffix}`);
+  return[...new Set(q.map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean))];
+}
+function devLanguageChanged(value){currentDevLang=value;loadDevSection(currentDevId)}
+function kidsLanguageChanged(value){currentKidsLang=value;loadKidsSection(currentKidsId)}
+async function loadDevotional(){const c=document.getElementById('devotional-content');c.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading devotional songs...</div>';let html=`<div class="filter-row"><label>Language</label><select id="dev-lang-select" onchange="devLanguageChanged(this.value)">${languageOptionsHtml(currentDevLang)}</select></div><div class="god-grid">`;for(const d of DEV_CATEGORIES){html+=`<div class="god-card" onclick="loadDevSection('${esc(d.id)}')"><div class="g-icon">${d.icon}</div><div class="g-name">${esc(d.name)}</div></div>`;}html+='</div><div id="dev-inner"></div>';c.innerHTML=html;await loadDevSection(currentDevId||DEV_CATEGORIES[0].id);}
+function renderDevSection(){const d=DEV_CATEGORIES.find(x=>x.id===currentDevId);const inner=document.getElementById('dev-inner');if(!d||!inner)return;const songs=uniqueSongs(devSongs);let h=songs.length?`<div class="sec-title">🙏 ${esc(d.name)}</div><ul class="song-list">`:'';songs.forEach(s=>h+=songItemHtml(s));h+=songs.length?'</ul>':'<div class="empty">No devotional songs found</div>';h+=`<div class="load-more-wrap"><button id="dev-load-more-btn" class="load-more-btn" onclick="loadMoreDevSongs()">🙏 Load more ${esc(d.name)} songs</button></div>`;inner.innerHTML=h}
+async function loadDevSection(id){const d=DEV_CATEGORIES.find(x=>x.id===id);if(!d)return;currentDevId=id;devSongs=[];devUsedQueries=new Set();document.querySelectorAll('#tab-devotional .god-card').forEach(el=>el.classList.remove('active'));const cards=[...document.querySelectorAll('#tab-devotional .god-card')];const idx=DEV_CATEGORIES.findIndex(x=>x.id===id);if(cards[idx])cards[idx].classList.add('active');const inner=document.getElementById('dev-inner');inner.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading songs...</div>';await loadMoreDevSongs(true);}
+async function loadMoreDevSongs(initial=false){if(isDevLoading)return;const d=DEV_CATEGORIES.find(x=>x.id===currentDevId);if(!d)return;isDevLoading=true;const btn=document.getElementById('dev-load-more-btn');const orig=btn?.textContent||'';if(btn){btn.disabled=true;btn.textContent='Loading more...';}const all=categoryQueryVariants(d,currentDevLang,'devotional');let unused=all.filter(q=>!devUsedQueries.has(q));if(!unused.length){devUsedQueries=new Set();unused=all;}const before=devSongs.length;let attempts=0;while(devSongs.length<before+(initial?8:10)&&unused.length&&attempts<(initial?1:4)){const batch=unused.slice(0,initial?4:5);batch.forEach(q=>devUsedQueries.add(q));const fresh=await multiQuery(batch);devSongs=mergeSongs(devSongs,fresh);unused=all.filter(q=>!devUsedQueries.has(q));attempts++;}renderDevSection();if(btn){btn.disabled=false;btn.textContent=orig;}const added=devSongs.length-before;if(!initial)showToast(added?`Added ${added} devotional songs`:'No more devotional songs found');isDevLoading=false;}
+async function loadKids(){const c=document.getElementById('kids-content');c.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading kids songs...</div>';let html=`<div class="filter-row"><label>Language</label><select id="kids-lang-select" onchange="kidsLanguageChanged(this.value)">${languageOptionsHtml(currentKidsLang)}</select></div><div class="god-grid">`;for(const k of KIDS_CATEGORIES){html+=`<div class="god-card" onclick="loadKidsSection('${esc(k.id)}')"><div class="g-icon">${k.icon}</div><div class="g-name">${esc(k.name)}</div></div>`;}html+='</div><div id="kids-inner"></div>';c.innerHTML=html;await loadKidsSection(currentKidsId||KIDS_CATEGORIES[0].id);}
+function renderKidsSection(){const k=KIDS_CATEGORIES.find(x=>x.id===currentKidsId);const inner=document.getElementById('kids-inner');if(!k||!inner)return;const songs=uniqueSongs(kidsSongs);let h=songs.length?`<div class="sec-title">👶 ${esc(k.name)}</div><ul class="song-list">`:'';songs.forEach(s=>h+=songItemHtml(s));h+=songs.length?'</ul>':'<div class="empty">No kids songs found</div>';h+=`<div class="load-more-wrap"><button id="kids-load-more-btn" class="load-more-btn" onclick="loadMoreKidsSongs()">👶 Load more ${esc(k.name)} songs</button></div>`;inner.innerHTML=h}
+async function loadKidsSection(id){const k=KIDS_CATEGORIES.find(x=>x.id===id);if(!k)return;currentKidsId=id;kidsSongs=[];kidsUsedQueries=new Set();document.querySelectorAll('#tab-kids .god-card').forEach(el=>el.classList.remove('active'));const cards=[...document.querySelectorAll('#tab-kids .god-card')];const idx=KIDS_CATEGORIES.findIndex(x=>x.id===id);if(cards[idx])cards[idx].classList.add('active');const inner=document.getElementById('kids-inner');inner.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading songs...</div>';await loadMoreKidsSongs(true);}
+async function loadMoreKidsSongs(initial=false){if(isKidsLoading)return;const k=KIDS_CATEGORIES.find(x=>x.id===currentKidsId);if(!k)return;isKidsLoading=true;const btn=document.getElementById('kids-load-more-btn');const orig=btn?.textContent||'';if(btn){btn.disabled=true;btn.textContent='Loading more...';}const all=categoryQueryVariants(k,currentKidsLang,'kids');let unused=all.filter(q=>!kidsUsedQueries.has(q));if(!unused.length){kidsUsedQueries=new Set();unused=all;}const before=kidsSongs.length;let attempts=0;while(kidsSongs.length<before+(initial?8:10)&&unused.length&&attempts<(initial?1:4)){const batch=unused.slice(0,initial?4:5);batch.forEach(q=>kidsUsedQueries.add(q));const fresh=await multiQuery(batch);kidsSongs=mergeSongs(kidsSongs,fresh);unused=all.filter(q=>!kidsUsedQueries.has(q));attempts++;}renderKidsSection();if(btn){btn.disabled=false;btn.textContent=orig;}const added=kidsSongs.length-before;if(!initial)showToast(added?`Added ${added} kids songs`:'No more kids songs found');isKidsLoading=false;}
+const _showTab=showTab;showTab=function(tab){_showTab(tab);if(tab==='party')loadParty();if(tab==='devotional')loadDevotional();if(tab==='kids')loadKids();}
+document.getElementById('search-input').addEventListener('input',e=>{clearTimeout(searchTimeout);const q=e.target.value.trim();if(!q)return;showTab('search');searchTimeout=setTimeout(()=>doSearch(q),500)});
+audio.addEventListener('timeupdate',()=>{if(!audio.duration)return;document.getElementById('np-progress-fill').style.width=((audio.currentTime/audio.duration)*100)+'%';document.getElementById('np-current').textContent=Math.floor(audio.currentTime/60)+':'+String(Math.floor(audio.currentTime%60)).padStart(2,'0');document.getElementById('np-duration').textContent=Math.floor(audio.duration/60)+':'+String(Math.floor(audio.duration%60)).padStart(2,'0');lastAudioTime=audio.currentTime});
+audio.addEventListener('seeking',handleExternalSeek);
+audio.addEventListener('seeked',handleExternalSeek);
+audio.addEventListener('ended',()=>{if(videoSidePanel?.classList.contains('active'))nextVideoTrack();else nextTrack();});
+audio.addEventListener('play',()=>{if(songVideo?.src&&!lockScreenMuted)songVideo.play().catch(()=>{});document.getElementById('btn-play').textContent=lockScreenMuted?'▶':'⏸';if('mediaSession'in navigator)navigator.mediaSession.playbackState=lockScreenMuted?'paused':'playing';if(pausedWhileHidden&&!recoveringLockScreenAudio)setTimeout(recoverHiddenResume,80)});
+audio.addEventListener('pause',()=>{if(songVideo?.src)songVideo.pause();lastPausedAt=audio.currentTime||lastPausedAt;pausedWhileHidden=document.hidden||document.visibilityState==='hidden';document.getElementById('btn-play').textContent='▶';if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'});
+audio.addEventListener('stalled',()=>{if(!audio.paused)watchResumeProgress(audio.currentTime||lastPausedAt)});
+songVideoFile?.addEventListener('change',()=>{
+  if(queueIndex<0||queueIndex>=queue.length)return;
+  const file=songVideoFile.files?.[0];
+  if(!file)return;
+  const song=queue[queueIndex];
+  song.videoUrl=URL.createObjectURL(file);
+  updateSongVideo(song);
+  showToast('Local video attached for this play session');
+});
+document.getElementById('home-year-select').addEventListener('change',()=>ensureFilteredSongs(20));
+document.getElementById('home-hero-select').addEventListener('change',()=>ensureFilteredSongs(20));
+document.getElementById('home-singer-select').addEventListener('change',()=>ensureFilteredSongs(20));
+document.getElementById('party-year-select').addEventListener('change',()=>ensurePartyFilteredSongs(20));
+document.getElementById('party-hero-select').addEventListener('change',()=>ensurePartyFilteredSongs(20));
+document.getElementById('party-singer-select').addEventListener('change',()=>ensurePartyFilteredSongs(20));
+setupMediaSessionControls();
+registerServiceWorker();
+loadTrending('hindi');
+</script>
+</body>
+</html>
