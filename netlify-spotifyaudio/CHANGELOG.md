@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.19 - 2026-07-17
+
+- Moved the active song light animation outside/on top of the song row border.
+- Removed the rotating inside-rectangle green gradient layer.
+- Slowed the small border light to an 11-second outside-edge trace.
+
 ## 1.0.18 - 2026-07-17
 
 - Reworked the active song border animation into a slower continuous green gradient layer.
