@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.27 - 2026-07-17
+
+- Limited concurrent song API searches to reduce throttling and partial results.
+- Made Trending fetch multiple smaller batches until it has a fuller mixed list.
+- Reduced background language prefetch so it no longer competes with active sections.
+
 ## 1.0.26 - 2026-07-17
 
 - Added explicit Hollywood party artist seeds to Trending, including Pitbull, DJ Snake, David Guetta, Calvin Harris, Flo Rida, LMFAO, and more.

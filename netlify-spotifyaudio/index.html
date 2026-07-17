@@ -734,7 +734,7 @@ body{
 <script>
 const SAAVN_API='https://saavnapi-nine.vercel.app/result/';
 const FALLBACK_API='/.netlify/functions/jiosaavn';
-const APP_VERSION='1.0.26';
+const APP_VERSION='1.0.27';
 let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false,trendingMixInitialized=false,aiSearchIntent=null;
 const homeLanguageMemory=new Map(),homeLanguagePrefetching=new Set();
 let partyAllSongs=[],currentPartyLang='hindi',partyUsedQueries=new Set(),isPartyLoading=false,partyInitialized=false;
@@ -950,11 +950,19 @@ async function apiQuery(query){
   }
 }
 async function multiQuery(queries){
-  const batches=await Promise.all(queries.map(async q=>{
-    const queryYear=(String(q).match(/\b(20\d{2}|19\d{2})\b/)||[])[1]||'';
-    const rows=await apiQuery(q);
-    return rows.map(s=>({...s,_query:q,_queryYear:queryYear}));
-  }));
+  const uniqueQueries=[...new Set((queries||[]).map(q=>String(q||'').trim()).filter(Boolean))];
+  const batches=[];
+  const limit=3;
+  let index=0;
+  async function worker(){
+    while(index<uniqueQueries.length){
+      const q=uniqueQueries[index++];
+      const queryYear=(String(q).match(/\b(20\d{2}|19\d{2})\b/)||[])[1]||'';
+      const rows=await apiQuery(q);
+      batches.push(rows.map(s=>({...s,_query:q,_queryYear:queryYear})));
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(limit,uniqueQueries.length)},worker));
   const seen=new Set();const merged=[];
   batches.flat().forEach(s=>{const id=String(s.id||s.songid||s.media_url||'');if(id&&!seen.has(id)){seen.add(id);merged.push(s);}});
   return merged;
@@ -1338,14 +1346,15 @@ function renderHomeLanguageLoading(lang){
 function prefetchHomeLanguages(activeLang){
   const order=LANGUAGE_OPTIONS.map(([value])=>value);
   const idx=order.indexOf(activeLang);
-  const targets=[order[idx+1],order[idx+2],order[idx-1]].filter(Boolean);
-  targets.forEach(lang=>prefetchHomeLanguage(lang));
+  const target=[order[idx+1],order[idx-1]].filter(Boolean)[0];
+  if(target)setTimeout(()=>prefetchHomeLanguage(target),1800);
 }
 async function prefetchHomeLanguage(lang){
+  if(isLoadingMore||isPartyLoading||isDevLoading||isKidsLoading||isSearchLoading)return;
   if(homeLanguageMemory.has(lang)||homeLanguagePrefetching.has(lang)||readCachedSongs('home',lang).length)return;
   homeLanguagePrefetching.add(lang);
   try{
-    const queries=homeQueriesForLang(lang).slice(0,4);
+    const queries=homeQueriesForLang(lang).slice(0,2);
     const songs=await multiQuery(queries);
     if(songs.length){
       const merged=sortByLatestRelevance(uniqueSongs(songs),songs,'home');
@@ -1533,13 +1542,15 @@ async function loadTrendingMix(force=false){
   const c=document.getElementById('search-results');
   c.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading trending mix...</div>';
   const queries=trendingMixQueries();
-  const first=queries.slice(0,10);
-  first.forEach(q=>searchUsedQueries.add(q));
-  let mixed=await multiQuery(first);
-  if(!mixed.length){
-    const fallback=queries.slice(10,20).filter(q=>!searchUsedQueries.has(q));
-    fallback.forEach(q=>searchUsedQueries.add(q));
-    mixed=await multiQuery(fallback);
+  let mixed=[];
+  let cursor=0;
+  while(uniqueSongs(mixed).length<18&&cursor<queries.length){
+    const batch=queries.slice(cursor,cursor+5).filter(q=>!searchUsedQueries.has(q));
+    cursor+=5;
+    if(!batch.length)continue;
+    batch.forEach(q=>searchUsedQueries.add(q));
+    const fresh=await multiQuery(batch);
+    mixed=mergeSongs(mixed,fresh);
   }
   searchSongs=sortByLatestRelevance(mixed,mixed,'party');
   renderSearchResults();
