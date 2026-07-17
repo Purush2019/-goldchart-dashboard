@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.17 - 2026-07-17
+
+- Slowed the active song border tracer for smoother movement.
+- Reduced the rainbow light segment size and glow intensity.
+
 ## 1.0.16 - 2026-07-17
 
 - Changed the active song animation to a slow rainbow line that travels around the rectangle border.

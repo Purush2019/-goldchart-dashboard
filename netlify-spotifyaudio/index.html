@@ -419,13 +419,13 @@ body{
 .song-item::after{
   content:"";
   position:absolute;
-  width:72px;
-  height:3px;
+  width:30px;
+  height:2px;
   left:12px;
   top:-1px;
   border-radius:999px;
   background:linear-gradient(90deg,#ff3b30,#ffcc00,#34c759,#00c7ff,#5856d6,#ff2d55);
-  box-shadow:0 0 10px rgba(255,255,255,.85),0 0 18px rgba(0,199,255,.45),0 0 26px rgba(255,45,85,.42);
+  box-shadow:0 0 6px rgba(255,255,255,.7),0 0 12px rgba(0,199,255,.32),0 0 16px rgba(255,45,85,.24);
   opacity:0;
   pointer-events:none;
 }
@@ -439,7 +439,7 @@ body{
 }
 .song-item.playing::after{
   opacity:1;
-  animation:activeSongBorderTrace 3.8s linear infinite;
+  animation:activeSongBorderTrace 6.6s ease-in-out infinite;
 }
 .song-item.playing .s-art,.song-item.playing .s-info,.song-item.playing .s-actions,.song-item.playing .song-has-video{
   position:relative;
@@ -447,14 +447,14 @@ body{
 }
 .song-item.playing .s-title{color:#fff}
 @keyframes activeSongBorderTrace{
-  0%{width:72px;height:3px;left:12px;top:-1px;background:linear-gradient(90deg,#ff3b30,#ffcc00,#34c759,#00c7ff)}
-  23%{width:72px;height:3px;left:calc(100% - 84px);top:-1px;background:linear-gradient(90deg,#34c759,#00c7ff,#5856d6,#ff2d55)}
-  28%{width:3px;height:44px;left:calc(100% - 2px);top:10px;background:linear-gradient(180deg,#00c7ff,#5856d6,#ff2d55,#ff3b30)}
-  48%{width:3px;height:44px;left:calc(100% - 2px);top:calc(100% - 54px);background:linear-gradient(180deg,#ff2d55,#ff3b30,#ffcc00,#34c759)}
-  53%{width:72px;height:3px;left:calc(100% - 84px);top:calc(100% - 2px);background:linear-gradient(90deg,#5856d6,#00c7ff,#34c759,#ffcc00)}
-  76%{width:72px;height:3px;left:12px;top:calc(100% - 2px);background:linear-gradient(90deg,#ffcc00,#ff3b30,#ff2d55,#5856d6)}
-  81%{width:3px;height:44px;left:-1px;top:calc(100% - 54px);background:linear-gradient(180deg,#34c759,#ffcc00,#ff3b30,#ff2d55)}
-  100%{width:3px;height:44px;left:-1px;top:10px;background:linear-gradient(180deg,#ff3b30,#ffcc00,#34c759,#00c7ff)}
+  0%{width:30px;height:2px;left:14px;top:-1px;background:linear-gradient(90deg,#ff3b30,#ffcc00,#34c759)}
+  22%{width:30px;height:2px;left:calc(100% - 44px);top:-1px;background:linear-gradient(90deg,#34c759,#00c7ff,#5856d6)}
+  28%{width:2px;height:30px;left:calc(100% - 1px);top:14px;background:linear-gradient(180deg,#00c7ff,#5856d6,#ff2d55)}
+  47%{width:2px;height:30px;left:calc(100% - 1px);top:calc(100% - 44px);background:linear-gradient(180deg,#ff2d55,#ff3b30,#ffcc00)}
+  53%{width:30px;height:2px;left:calc(100% - 44px);top:calc(100% - 1px);background:linear-gradient(90deg,#5856d6,#00c7ff,#34c759)}
+  75%{width:30px;height:2px;left:14px;top:calc(100% - 1px);background:linear-gradient(90deg,#ffcc00,#ff3b30,#ff2d55)}
+  81%{width:2px;height:30px;left:-1px;top:calc(100% - 44px);background:linear-gradient(180deg,#34c759,#ffcc00,#ff3b30)}
+  100%{width:2px;height:30px;left:-1px;top:14px;background:linear-gradient(180deg,#ff3b30,#ffcc00,#34c759)}
 }
 .song-item .s-art{
   width:52px;
@@ -730,7 +730,7 @@ body{
 <script>
 const SAAVN_API='https://saavnapi-nine.vercel.app/result/';
 const FALLBACK_API='/.netlify/functions/jiosaavn';
-const APP_VERSION='1.0.16';
+const APP_VERSION='1.0.17';
 let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false,trendingMixInitialized=false,aiSearchIntent=null;
 let partyAllSongs=[],currentPartyLang='hindi',partyUsedQueries=new Set(),isPartyLoading=false,partyInitialized=false;
 let currentDevLang='hindi',currentKidsLang='english',currentDevId='ganesha',currentKidsId='rhymes';
