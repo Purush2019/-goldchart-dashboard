@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.14 - 2026-07-17
+
+- Added a circular lighting animation inside the currently playing song row.
+- Moved the active song highlight automatically when the queue advances to the next or previous track.
+
 ## 1.0.13 - 2026-07-17
 
 - Reduced bottom player spacing for a more compact mobile layout.
