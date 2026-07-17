@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.33 - 2026-07-17
+
+- Reset song cache namespaces so old mixed-language dropdown data is ignored.
+- Tagged cached song rows with their language bucket for stricter actor/singer filtering.
+- Removed the broad fallback that could show all actor/singer names when language metadata was missing.
+
 ## 1.0.32 - 2026-07-17
 
 - Scoped Home and Party actor/singer dropdowns to the selected language.
