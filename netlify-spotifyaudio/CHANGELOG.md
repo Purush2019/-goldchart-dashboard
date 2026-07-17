@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.13 - 2026-07-17
+
+- Reduced bottom player spacing for a more compact mobile layout.
+- Tightened artwork, controls, progress bar, timestamps, and page bottom padding.
+
 ## 1.0.12 - 2026-07-17
 
 - Upgraded the Home search bar into AI-style natural language search.
