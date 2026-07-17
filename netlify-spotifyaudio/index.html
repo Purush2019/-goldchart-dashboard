@@ -663,12 +663,13 @@ body{
 <script>
 const SAAVN_API='https://saavnapi-nine.vercel.app/result/';
 const FALLBACK_API='/.netlify/functions/jiosaavn';
-const APP_VERSION='1.0.9';
+const APP_VERSION='1.0.10';
 let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false,trendingMixInitialized=false;
 let partyAllSongs=[],currentPartyLang='hindi',partyUsedQueries=new Set(),isPartyLoading=false,partyInitialized=false;
 let currentDevLang='hindi',currentKidsLang='english',currentDevId='ganesha',currentKidsId='rhymes';
 let devSongs=[],kidsSongs=[],devUsedQueries=new Set(),kidsUsedQueries=new Set(),isDevLoading=false,isKidsLoading=false;
 let lastAudioTime=0,ignoreSeekUntil=0,lastPausedAt=0,resumeWatchTimer=null,pausedWhileHidden=false,recoveringLockScreenAudio=false,lockScreenMuted=false,lastVolume=1,recognition=null,isListening=false;
+let interruptionResumePending=false,interruptionResumeAt=0,manualPauseIntentUntil=0,interruptionResumeTimer=null;
 const songCache={};const audio=new Audio();
 audio.playsInline=true;audio.preload='metadata';audio.crossOrigin='anonymous';
 audio.autoplay=true;
@@ -1789,6 +1790,7 @@ async function lockScreenPlay(){
   if(audio.paused)return resumePlayback();
 }
 async function lockScreenPause(){
+  markManualPause();
   lastPausedAt=audio.currentTime||lastPausedAt;
   lastVolume=audio.volume||1;
   lockScreenMuted=true;
@@ -1803,11 +1805,64 @@ function watchResumeProgress(startAt){
     if(audio.currentTime<=startAt+.25)reloadCurrentAt(startAt);
   },1400);
 }
+function markManualPause(){
+  manualPauseIntentUntil=Date.now()+1800;
+  interruptionResumePending=false;
+  clearTimeout(interruptionResumeTimer);
+}
+function rememberInterruptionResume(){
+  if(!audio.src||queueIndex<0||audio.ended)return;
+  interruptionResumeAt=audio.currentTime||lastPausedAt||0;
+  interruptionResumePending=true;
+}
+function pauseForInterruption(){
+  if(!audio.src||queueIndex<0)return;
+  if(audio.paused&&!interruptionResumePending)return;
+  rememberInterruptionResume();
+  lastPausedAt=interruptionResumeAt;
+  if(songVideo?.src)songVideo.pause();
+  if(videoSidePanel?.classList.contains('active'))sendYouTubeCommand('pauseVideo');
+  if(!audio.paused)audio.pause();
+  document.getElementById('btn-play').textContent='▶';
+  if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused';
+}
+async function resumeAfterInterruption(){
+  clearTimeout(interruptionResumeTimer);
+  if(!interruptionResumePending||!audio.src||queueIndex<0)return;
+  if(document.hidden||document.visibilityState==='hidden')return;
+  const startAt=interruptionResumeAt||lastPausedAt||audio.currentTime||0;
+  interruptionResumePending=false;
+  lockScreenMuted=false;
+  audio.muted=false;
+  audio.volume=lastVolume||1;
+  try{
+    if(Math.abs((audio.currentTime||0)-startAt)>1.5&&audio.duration){
+      ignoreSeekUntil=Date.now()+1200;
+      audio.currentTime=Math.max(0,Math.min(audio.duration,startAt));
+    }
+    await audio.play();
+    document.getElementById('btn-play').textContent='⏸';
+    if('mediaSession'in navigator)navigator.mediaSession.playbackState='playing';
+    if(songVideo?.src)songVideo.play().catch(()=>{});
+    if(videoSidePanel?.classList.contains('active'))syncVideoToAudio(true);
+    watchResumeProgress(startAt);
+  }catch(e){
+    console.warn('interruption resume failed',e?.message);
+    interruptionResumePending=true;
+    showToast('Tap play to resume from where it paused');
+  }
+}
+function scheduleInterruptionResume(delay=650){
+  clearTimeout(interruptionResumeTimer);
+  interruptionResumeTimer=setTimeout(resumeAfterInterruption,delay);
+}
 async function resumePlayback(){
   try{
     lockScreenMuted=false;
     audio.muted=false;
     audio.volume=lastVolume||1;
+    interruptionResumePending=false;
+    clearTimeout(interruptionResumeTimer);
     if(!audio.src&&queueIndex>=0)return playCurrent();
     const startAt=lastPausedAt||audio.currentTime||0;
     if(audio.paused)await audio.play();
@@ -1817,6 +1872,7 @@ async function resumePlayback(){
   }catch(e){console.warn('resume failed',e?.message);showToast('Playback blocked — tap play button');}
 }
 function pausePlayback(){
+  markManualPause();
   lockScreenMuted=false;
   audio.muted=false;
   lastPausedAt=audio.currentTime||lastPausedAt;
@@ -2118,7 +2174,14 @@ audio.addEventListener('seeking',handleExternalSeek);
 audio.addEventListener('seeked',handleExternalSeek);
 audio.addEventListener('ended',()=>{if(videoSidePanel?.classList.contains('active'))nextVideoTrack();else nextTrack();});
 audio.addEventListener('play',()=>{if(songVideo?.src&&!lockScreenMuted)songVideo.play().catch(()=>{});document.getElementById('btn-play').textContent=lockScreenMuted?'▶':'⏸';if('mediaSession'in navigator)navigator.mediaSession.playbackState=lockScreenMuted?'paused':'playing';if(pausedWhileHidden&&!recoveringLockScreenAudio)setTimeout(recoverHiddenResume,80)});
-audio.addEventListener('pause',()=>{if(songVideo?.src)songVideo.pause();lastPausedAt=audio.currentTime||lastPausedAt;pausedWhileHidden=document.hidden||document.visibilityState==='hidden';document.getElementById('btn-play').textContent='▶';if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused'});
+audio.addEventListener('pause',()=>{
+  if(songVideo?.src)songVideo.pause();
+  lastPausedAt=audio.currentTime||lastPausedAt;
+  pausedWhileHidden=document.hidden||document.visibilityState==='hidden';
+  if(!audio.ended&&audio.src&&Date.now()>manualPauseIntentUntil)rememberInterruptionResume();
+  document.getElementById('btn-play').textContent='▶';
+  if('mediaSession'in navigator)navigator.mediaSession.playbackState='paused';
+});
 audio.addEventListener('stalled',()=>{if(!audio.paused)watchResumeProgress(audio.currentTime||lastPausedAt)});
 songVideoFile?.addEventListener('change',()=>{
   if(queueIndex<0||queueIndex>=queue.length)return;
@@ -2135,6 +2198,12 @@ document.getElementById('home-singer-select').addEventListener('change',()=>ensu
 document.getElementById('party-year-select').addEventListener('change',()=>ensurePartyFilteredSongs(20));
 document.getElementById('party-hero-select').addEventListener('change',()=>ensurePartyFilteredSongs(20));
 document.getElementById('party-singer-select').addEventListener('change',()=>ensurePartyFilteredSongs(20));
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden||document.visibilityState==='hidden')pauseForInterruption();
+  else scheduleInterruptionResume(700);
+});
+window.addEventListener('focus',()=>scheduleInterruptionResume(550));
+window.addEventListener('pageshow',()=>scheduleInterruptionResume(700));
 setupMediaSessionControls();
 registerServiceWorker();
 loadTrending('hindi');

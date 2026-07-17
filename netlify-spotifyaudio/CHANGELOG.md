@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.10 - 2026-07-17
+
+- Added call/interruption-aware playback recovery.
+- The player now remembers the paused timestamp during app interruptions and resumes from that spot when the app becomes active again.
+- Manual pause remains manual and will not auto-resume.
+
 ## 1.0.9 - 2026-07-17
 
 - Added a compact animated PulsePlay visualizer to the top-right header area.
