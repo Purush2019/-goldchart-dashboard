@@ -65,7 +65,27 @@ a{color:inherit;text-decoration:none}
 .search-wrap .s-icon{position:absolute;left:17px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--text2);font-size:0;text-indent:-999px;overflow:hidden}
 .search-wrap .s-icon::before{content:"";position:absolute;inset:1px;border:2px solid currentColor;border-radius:50%}
 .search-wrap .s-icon::after{content:"";position:absolute;width:7px;height:2px;right:-1px;bottom:1px;background:currentColor;border-radius:2px;transform:rotate(45deg);transform-origin:center}
-.search-wrap input{padding-right:48px}
+.search-wrap input{padding-right:86px}
+.ai-search-badge{
+  position:absolute;
+  right:50px;
+  top:50%;
+  transform:translateY(-50%);
+  height:26px;
+  min-width:30px;
+  border:0;
+  border-radius:999px;
+  background:linear-gradient(135deg,var(--accent),#fff);
+  color:#050505;
+  font-size:.62rem;
+  font-weight:900;
+  letter-spacing:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none;
+  box-shadow:0 8px 18px rgba(29,185,84,.22);
+}
 .mic-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;background:transparent;border:1px solid transparent;color:var(--text2);cursor:pointer;padding:0;border-radius:50%;transition:all .2s;display:flex;align-items:center;justify-content:center}
 .mic-btn svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .mic-btn:hover{color:var(--accent);background:rgba(29,185,84,.12);border-color:rgba(29,185,84,.22)}
@@ -280,7 +300,7 @@ body{
   border:0;
   color:#101010;
   border-radius:22px;
-  padding:14px 52px 14px 48px;
+  padding:14px 92px 14px 48px;
   font-size:.92rem;
   font-weight:650;
   box-shadow:0 14px 34px rgba(0,0,0,.28);
@@ -527,6 +547,7 @@ body{
   .header .logo{font-size:1.08rem}
   .header-pulse{width:66px;height:34px;gap:4px}
   .header-pulse span{width:3px}
+  .ai-search-badge{right:48px;height:24px;min-width:28px;font-size:.58rem}
   .search-section{padding-left:16px;padding-right:16px}
   .tabs{top:74px;padding-left:16px;padding-right:16px}
   .content{padding-left:16px;padding-right:16px;padding-bottom:176px}
@@ -563,7 +584,8 @@ body{
 <div class="search-section">
   <div class="search-wrap">
     <span class="s-icon" aria-hidden="true"></span>
-    <input type="text" id="search-input" placeholder="Search songs, albums, artists..." autocomplete="off">
+    <input type="text" id="search-input" placeholder="Ask AI for songs, artists, moods..." autocomplete="off">
+    <span class="ai-search-badge">AI</span>
     <button class="mic-btn" id="mic-btn" onclick="toggleMic()" aria-label="Voice search">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/><path d="M8 22h8"/></svg>
     </button>
@@ -663,8 +685,8 @@ body{
 <script>
 const SAAVN_API='https://saavnapi-nine.vercel.app/result/';
 const FALLBACK_API='/.netlify/functions/jiosaavn';
-const APP_VERSION='1.0.11';
-let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false,trendingMixInitialized=false;
+const APP_VERSION='1.0.12';
+let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false,trendingMixInitialized=false,aiSearchIntent=null;
 let partyAllSongs=[],currentPartyLang='hindi',partyUsedQueries=new Set(),isPartyLoading=false,partyInitialized=false;
 let currentDevLang='hindi',currentKidsLang='english',currentDevId='ganesha',currentKidsId='rhymes';
 let devSongs=[],kidsSongs=[],devUsedQueries=new Set(),kidsUsedQueries=new Set(),isDevLoading=false,isKidsLoading=false;
@@ -1293,15 +1315,56 @@ async function loadTrending(lang){
     }).catch(()=>{});
   }
 }
-function generateSearchQueries(q){
+function analyzeAISearchIntent(q){
+  const base=decodeHtml(q||'').trim();
+  const lower=base.toLowerCase();
+  const currentYear=String(new Date().getFullYear());
+  const year=(lower.match(/\b(20\d{2}|19\d{2})\b/)||[])[1]||'';
+  const lang=Object.keys(LANG_TERMS).find(key=>LANG_TERMS[key].some(term=>lower.includes(term)))||'';
+  const category=/\b(devotional|bhajan|aarti|mantra|god|temple|shiva|krishna|ganesh|hanuman|durga|murugan|ayyappa)\b/i.test(base)?'devotional':
+    /\b(kids|children|baby|rhymes|nursery|cartoon|cocomelon|phonics|abc)\b/i.test(base)?'kids':
+    /\b(party|dance|club|dj|edm|remix|workout|gym)\b/i.test(base)?'party':'';
+  const mood=/\b(romantic|love|melody|sad|feel|chill|lofi|mass|kuthu|folk|rap|hip hop|birthday|wedding)\b/i.exec(base)?.[1]||'';
+  const wantsLatest=/\b(latest|new|recent|today|trending|viral|top|fresh|now)\b/i.test(base);
+  const cleaned=base
+    .replace(/\b(ai|please|play|show|find|search|give|me|songs?|music|tracks?|audio|playlist|latest|new|recent|today|trending|viral|top|best|fresh|now|all|from|by|for|movie|movies|film|films|album|albums)\b/gi,' ')
+    .replace(/\b(devotional|bhajan|aarti|mantra|god|temple|kids|children|baby|rhymes|nursery|cartoon|party|dance|club|dj|edm|remix|romantic|love|melody|sad|chill|lofi|mass|kuthu|folk|rap|hip hop|birthday|wedding)\b/gi,' ')
+    .replace(/\b(20\d{2}|19\d{2})\b/g,' ')
+    .replace(new RegExp(`\\b(${Object.values(LANG_TERMS).flat().join('|')})\\b`,'gi'),' ')
+    .replace(/\s+/g,' ')
+    .trim();
+  return{raw:base,lower,year:year||'',lang,category,mood,wantsLatest,entity:cleaned};
+}
+function aiSearchBoostQueries(intent){
+  const y=intent.year||String(new Date().getFullYear());
+  const entity=intent.entity||intent.raw;
+  const langWords=intent.lang?(LANG_TERMS[intent.lang]||[intent.lang]):[];
+  const terms=[];
+  if(intent.category==='devotional'){
+    terms.push(`${entity} devotional songs`,`${entity} bhajan`,`${entity} aarti`,`${entity} mantra`,`${entity} latest devotional songs ${y}`);
+  }else if(intent.category==='kids'){
+    terms.push(`${entity} kids songs`,`${entity} nursery rhymes`,`${entity} baby songs`,`${entity} learning songs`,`${entity} cartoon songs`);
+  }else if(intent.category==='party'){
+    terms.push(`${entity} party songs ${y}`,`${entity} dance hits ${y}`,`${entity} club hits`,`${entity} dj remix`,`${entity} viral dance songs`);
+  }
+  if(intent.mood)terms.push(`${entity} ${intent.mood} songs`,`${intent.mood} ${entity} hits`,`${intent.mood} songs ${y}`);
+  if(intent.wantsLatest)terms.push(`${entity} latest songs ${y}`,`${entity} trending songs today`,`${entity} viral songs today`,`${entity} new songs ${y}`);
+  if(intent.year)terms.push(`${entity} songs ${intent.year}`,`${entity} hits ${intent.year}`,`${entity} movie songs ${intent.year}`);
+  for(const lw of langWords){
+    terms.push(`${entity} ${lw} songs`,`${entity} ${lw} hits`,`${entity} latest ${lw} songs ${y}`,`${lw} trending songs today`);
+    if(intent.category)terms.push(`${lw} ${intent.category} songs ${y}`,`${entity} ${lw} ${intent.category} songs`);
+  }
+  return terms;
+}
+function generateSearchQueries(q,intent=analyzeAISearchIntent(q)){
   const base=q.trim();
   const lower=base.toLowerCase();
-  const lang=Object.keys(LANG_TERMS).find(key=>LANG_TERMS[key].some(term=>lower.includes(term)))||'';
+  const lang=intent.lang||Object.keys(LANG_TERMS).find(key=>LANG_TERMS[key].some(term=>lower.includes(term)))||'';
   const name=base.replace(/\b(songs?|music|hits?|movie|movies|film|films|audio|track|tracks|play|search|find|show|latest|top|best|all)\b/gi,' ').replace(/\s+/g,' ').trim();
-  const searchName=name||base;
+  const searchName=intent.entity||name||base;
   const candidateLangs=lang?[lang]:Object.keys(LANG_TERMS).filter(key=>LANG_SEEDS[key]?.some(seed=>seed.toLowerCase().includes(searchName.toLowerCase())||searchName.toLowerCase().includes(seed.toLowerCase().split(' ')[0]))).slice(0,2);
   if(!candidateLangs.length)candidateLangs.push('tamil','hindi','telugu');
-  const variants=[base,searchName,`${base} hits`,`${base} latest`,`${base} movie songs`,`${base} playlist`,`${base} top songs`,`${base} love songs`,`${base} melody`,`${base} dance songs`,`${base} 2024`,`${base} 2023`,`${base} 2022`,`${searchName} songs`,`${searchName} hits`,`${searchName} movie songs`,`${searchName} film songs`,`${searchName} album`,`${searchName} playlist`,`${searchName} love songs`,`${searchName} dance songs`,`${searchName} latest`,`${searchName} top songs`];
+  const variants=[...aiSearchBoostQueries(intent),base,searchName,`${base} hits`,`${base} latest`,`${base} movie songs`,`${base} playlist`,`${base} top songs`,`${base} love songs`,`${base} melody`,`${base} dance songs`,`${base} 2024`,`${base} 2023`,`${base} 2022`,`${searchName} songs`,`${searchName} hits`,`${searchName} movie songs`,`${searchName} film songs`,`${searchName} album`,`${searchName} playlist`,`${searchName} love songs`,`${searchName} dance songs`,`${searchName} latest`,`${searchName} top songs`];
   for(const key of candidateLangs){
     const langWords=LANG_TERMS[key]||[key];
     for(const lw of langWords)variants.push(`${searchName} ${lw} songs`,`${searchName} ${lw} hits`,`${searchName} ${lw} movie songs`,`${searchName} ${lw} film songs`,`${searchName} ${lw} album`,`${searchName} ${lw} playlist`);
@@ -1312,6 +1375,22 @@ function generateSearchQueries(q){
     for(const seed of LANG_SEEDS[lang]||[])variants.push(`${seed} ${base}`,`${seed} songs`,`${seed} hits`);
   }
   return[...new Set(variants.map(x=>x.trim()).filter(Boolean))];
+}
+function aiRankSongs(songs,intent){
+  if(!intent?.raw)return sortByLatestRelevance(songs,songs,'home');
+  const latest=sortByLatestRelevance(uniqueSongs(songs),songs,intent.category||'home');
+  const wanted=[intent.entity,intent.mood,intent.category,intent.lang,...(intent.lang?LANG_TERMS[intent.lang]||[]:[])].filter(Boolean).map(x=>String(x).toLowerCase());
+  const queryTerms=intent.raw.toLowerCase().split(/\s+/).filter(w=>w.length>2&&!/songs?|music|play|show|find|latest|new|top|best/.test(w));
+  return latest.map((song,idx)=>{
+    const n=normalizeSong(song);
+    const text=`${n.name} ${n.artist} ${n.year} ${song._query||''}`.toLowerCase();
+    let score=1000-idx;
+    for(const term of wanted)if(term&&text.includes(term))score+=80;
+    for(const term of queryTerms)if(text.includes(term))score+=35;
+    if(intent.year&&text.includes(intent.year))score+=120;
+    if(intent.wantsLatest&&/\b(latest|new|trending|viral|2026|2025|2024)\b/.test(text))score+=80;
+    return{song,score};
+  }).sort((a,b)=>b.score-a.score).map(x=>x.song);
 }
 function trendingMixQueries(){
   const y=new Date().getFullYear();
@@ -1356,8 +1435,8 @@ async function loadTrendingMix(force=false){
 }
 function renderSearchResults(){
   const c=document.getElementById('search-results');
-  const songs=sortByLatestRelevance(searchSongs,searchSongs,searchQuery?'home':'party');
-  let h=searchQuery?`<div class="sec-title">Search results</div>`:`<div class="sec-title">Trending mix</div>`;
+  const songs=searchQuery?aiRankSongs(searchSongs,aiSearchIntent):sortByLatestRelevance(searchSongs,searchSongs,'party');
+  let h=searchQuery?`<div class="sec-title">AI search results</div>`:`<div class="sec-title">Trending mix</div>`;
   h+=songs.length?'<ul class="song-list">':'';
   songs.forEach(s=>h+=songItemHtml(s));
   h+=searchSongs.length?'</ul>':'';
@@ -1367,10 +1446,11 @@ function renderSearchResults(){
 }
 async function doSearch(q){
   searchQuery=q.trim();
+  aiSearchIntent=analyzeAISearchIntent(searchQuery);
   searchSongs=[];
   searchUsedQueries=new Set();
   const c=document.getElementById('search-results');
-  c.innerHTML='<div class="loading"><span class="spinner"></span><br>Searching...</div>';
+  c.innerHTML='<div class="loading"><span class="spinner"></span><br>AI searching...</div>';
   await loadMoreSearchResults();
 }
 async function loadMoreSearchResults(){
@@ -1382,7 +1462,7 @@ async function loadMoreSearchResults(){
   const existingIds=new Set(searchSongs.map(s=>String(s.id||s.songid||s.media_url||'')));
   let added=0,attempts=0;
   while(added<18&&attempts<6){
-    const unused=(searchQuery?generateSearchQueries(searchQuery):trendingMixQueries()).filter(q=>!searchUsedQueries.has(q));
+    const unused=(searchQuery?generateSearchQueries(searchQuery,aiSearchIntent):trendingMixQueries()).filter(q=>!searchUsedQueries.has(q));
     if(!unused.length)break;
     const batch=unused.slice(0,8);
     batch.forEach(q=>searchUsedQueries.add(q));
@@ -2157,7 +2237,7 @@ function renderKidsSection(){const k=KIDS_CATEGORIES.find(x=>x.id===currentKidsI
 async function loadKidsSection(id){const k=KIDS_CATEGORIES.find(x=>x.id===id);if(!k)return;currentKidsId=id;kidsSongs=[];kidsUsedQueries=new Set();document.querySelectorAll('#tab-kids .god-card').forEach(el=>el.classList.remove('active'));const cards=[...document.querySelectorAll('#tab-kids .god-card')];const idx=KIDS_CATEGORIES.findIndex(x=>x.id===id);if(cards[idx])cards[idx].classList.add('active');const inner=document.getElementById('kids-inner');inner.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading songs...</div>';await loadMoreKidsSongs(true);}
 async function loadMoreKidsSongs(initial=false){if(isKidsLoading)return;const k=KIDS_CATEGORIES.find(x=>x.id===currentKidsId);if(!k)return;isKidsLoading=true;const btn=document.getElementById('kids-load-more-btn');const orig=btn?.textContent||'';if(btn){btn.disabled=true;btn.textContent='Loading more...';}const all=categoryQueryVariants(k,currentKidsLang,'kids');let unused=all.filter(q=>!kidsUsedQueries.has(q));if(!unused.length){kidsUsedQueries=new Set();unused=all;}const before=kidsSongs.length;let attempts=0;while(kidsSongs.length<before+(initial?8:10)&&unused.length&&attempts<(initial?1:4)){const batch=unused.slice(0,initial?4:5);batch.forEach(q=>kidsUsedQueries.add(q));const fresh=await multiQuery(batch);kidsSongs=mergeSongs(kidsSongs,fresh);unused=all.filter(q=>!kidsUsedQueries.has(q));attempts++;}renderKidsSection();if(btn){btn.disabled=false;btn.textContent=orig;}const added=kidsSongs.length-before;if(!initial)showToast(added?`Added ${added} kids songs`:'No more kids songs found');isKidsLoading=false;}
 const _showTab=showTab;showTab=function(tab){_showTab(tab);if(tab==='party')loadParty();if(tab==='devotional')loadDevotional();if(tab==='kids')loadKids();if(tab==='search'&&!document.getElementById('search-input').value.trim())loadTrendingMix();}
-document.getElementById('search-input').addEventListener('input',e=>{clearTimeout(searchTimeout);const q=e.target.value.trim();if(!q)return;showTab('search');searchTimeout=setTimeout(()=>doSearch(q),500)});
+document.getElementById('search-input').addEventListener('input',e=>{clearTimeout(searchTimeout);const q=e.target.value.trim();if(!q){searchQuery='';aiSearchIntent=null;showTab('search');loadTrendingMix(true);return;}showTab('search');searchTimeout=setTimeout(()=>doSearch(q),500)});
 audio.addEventListener('timeupdate',()=>{if(!audio.duration)return;document.getElementById('np-progress-fill').style.width=((audio.currentTime/audio.duration)*100)+'%';document.getElementById('np-current').textContent=Math.floor(audio.currentTime/60)+':'+String(Math.floor(audio.currentTime%60)).padStart(2,'0');document.getElementById('np-duration').textContent=Math.floor(audio.duration/60)+':'+String(Math.floor(audio.duration%60)).padStart(2,'0');lastAudioTime=audio.currentTime});
 audio.addEventListener('seeking',handleExternalSeek);
 audio.addEventListener('seeked',handleExternalSeek);

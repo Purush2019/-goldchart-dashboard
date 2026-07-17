@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.12 - 2026-07-17
+
+- Upgraded the Home search bar into AI-style natural language search.
+- Added query intent detection for language, latest/trending requests, mood, category, year, and artist/song terms.
+- Ranked AI search results against the detected intent instead of only using raw API order.
+- Reset cleared searches back to the Trending mix.
+
 ## 1.0.11 - 2026-07-17
 
 - Fixed lock-screen Play/Pause controls to use the same real pause/resume behavior as the in-app player.
