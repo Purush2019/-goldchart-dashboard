@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.30 - 2026-07-17
+
+- Fixed the browser song search path so empty mirror API responses now fall through to the working Netlify fallback.
+- Prevented empty public API arrays from causing Home, Party, Devotional, and Kids to render no songs.
+
 ## 1.0.29 - 2026-07-17
 
 - Added a direct JioSaavn playlist/album fallback when public song API mirrors return empty results.
