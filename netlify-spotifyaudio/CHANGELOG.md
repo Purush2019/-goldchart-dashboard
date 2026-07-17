@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4 - 2026-07-17
+
+- Reduced UI font sizes and weights for a more professional app feel.
+- Restored all mobile bottom player controls: previous, rewind, play, fast forward, next, and Video.
+- Kept the Video button visible on mobile so audio can still switch to video mode.
+
 ## 1.0.3 - 2026-07-17
 
 - Rebranded the app from Spotify Audio to PulsePlay with a custom logo.
