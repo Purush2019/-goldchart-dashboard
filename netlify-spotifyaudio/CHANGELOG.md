@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.7 - 2026-07-17
+
+- Applied latest-relevance sorting to Party, Devotional, and Kids feeds.
+- Preserved API/query order as the fallback instead of alphabetical song ordering.
+- Fixed Devotional/Kids selected category contrast so white active cards keep readable dark labels.
+
 ## 1.0.6 - 2026-07-17
 
 - Changed Home song ordering to prioritize latest, trending, viral, and current-year results.

@@ -156,7 +156,7 @@ a{color:inherit;text-decoration:none}
 .god-card:hover,.god-card.active{background:var(--accent);border-color:var(--accent);color:#000;transform:translateY(-2px);box-shadow:0 4px 16px rgba(29,185,84,.25)}
 .god-card .g-icon{font-size:1.15rem;margin-bottom:8px}
 .god-card .g-name{font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.god-card.active .g-name{color:#fff}
+.god-card.active .g-name{color:inherit}
 
 /* Devotional language pills */
 .dev-langs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
@@ -446,6 +446,7 @@ body{
   color:#050505;
   border-color:#fff;
 }
+.god-card:hover .g-name,.god-card.active .g-name{color:#050505}
 .god-card:hover .g-icon,.god-card.active .g-icon{background:rgba(0,0,0,.08)}
 .now-playing{
   left:0;
@@ -640,7 +641,7 @@ body{
 <script>
 const SAAVN_API='https://saavnapi-nine.vercel.app/result/';
 const FALLBACK_API='/.netlify/functions/jiosaavn';
-const APP_VERSION='1.0.6';
+const APP_VERSION='1.0.7';
 let searchTimeout=null,queue=[],queueIndex=-1,homeAllSongs=[],currentLang='hindi',usedQueries=new Set(),isLoadingMore=false,searchQuery='',searchSongs=[],searchUsedQueries=new Set(),isSearchLoading=false;
 let partyAllSongs=[],currentPartyLang='hindi',partyUsedQueries=new Set(),isPartyLoading=false,partyInitialized=false;
 let currentDevLang='hindi',currentKidsLang='english',currentDevId='ganesha',currentKidsId='rhymes';
@@ -1050,7 +1051,15 @@ function getHomeFilters(){
     singer:document.getElementById('home-singer-select').value.trim()
   };
 }
-function homeSongLatestScore(song,indexMap){
+function sourceIndexMap(songs){
+  const indexMap=new Map();
+  songs.forEach((song,index)=>{
+    const id=String(song.id||song.songid||song.media_url||song.previewUrl||'');
+    if(id&&!indexMap.has(id))indexMap.set(id,index);
+  });
+  return indexMap;
+}
+function songLatestScore(song,indexMap,type='home'){
   const n=normalizeSong(song);
   const currentYear=new Date().getFullYear();
   const year=Number(n.year||song._queryYear||0);
@@ -1062,26 +1071,28 @@ function homeSongLatestScore(song,indexMap){
   if(/\b(today|trending|viral|latest|new|current|fresh)\b/.test(query))score+=400;
   if(query.includes(monthName().toLowerCase()))score+=180;
   if(/\b(top|hits)\b/.test(query))score+=80;
+  if(type==='party'&&/\b(party|dance|club|dj|remix|mass|kuthu|celebration)\b/.test(query))score+=120;
+  if(type==='devotional'&&/\b(latest|popular|morning|temple|playlist)\b/.test(query))score+=120;
+  if(type==='kids'&&/\b(latest|popular|learning|cartoon|playlist|dance|bedtime)\b/.test(query))score+=120;
   const id=String(song.id||song.songid||song.media_url||song.previewUrl||'');
   return score*10000-(indexMap.get(id)??0);
+}
+function sortByLatestRelevance(songs,sourceSongs,type='home'){
+  const indexMap=sourceIndexMap(sourceSongs||songs);
+  return uniqueSongs(songs).slice().sort((a,b)=>{
+    const diff=songLatestScore(b,indexMap,type)-songLatestScore(a,indexMap,type);
+    if(diff)return diff;
+    const aid=String(a.id||a.songid||a.media_url||a.previewUrl||'');
+    const bid=String(b.id||b.songid||b.media_url||b.previewUrl||'');
+    return (indexMap.get(aid)??0)-(indexMap.get(bid)??0);
+  });
 }
 function getFilteredHomeSongs(year,artist,singer=''){
   let filtered=uniqueSongs(homeAllSongs);
   if(year)filtered=filtered.filter(s=>normalizeSong(s).year===year);
   if(artist)filtered=filtered.filter(s=>artistMatchesSong(s,artist));
   if(singer)filtered=filtered.filter(s=>singerMatchesSong(s,singer));
-  const indexMap=new Map();
-  homeAllSongs.forEach((song,index)=>{
-    const id=String(song.id||song.songid||song.media_url||song.previewUrl||'');
-    if(id&&!indexMap.has(id))indexMap.set(id,index);
-  });
-  return filtered.slice().sort((a,b)=>{
-    const diff=homeSongLatestScore(b,indexMap)-homeSongLatestScore(a,indexMap);
-    if(diff)return diff;
-    const aid=String(a.id||a.songid||a.media_url||a.previewUrl||'');
-    const bid=String(b.id||b.songid||b.media_url||b.previewUrl||'');
-    return (indexMap.get(aid)??0)-(indexMap.get(bid)??0);
-  });
+  return sortByLatestRelevance(filtered,homeAllSongs,'home');
 }
 function renderHomeFiltered(){
   const {year,artist,singer}=getHomeFilters();
@@ -1849,11 +1860,11 @@ function getFilteredPartySongs(year,artist,singer=''){
   if(year)filtered=filtered.filter(s=>normalizeSong(s).year===year);
   if(artist)filtered=filtered.filter(s=>artistMatchesSong(s,artist));
   if(singer)filtered=filtered.filter(s=>singerMatchesSong(s,singer));
-  return filtered;
+  return sortByLatestRelevance(filtered,partyAllSongs,'party');
 }
 function renderPartyFiltered(){
   const {year,artist,singer}=getPartyFilters();
-  const filtered=uniqueSongs(getFilteredPartySongs(year,artist,singer));
+  const filtered=getFilteredPartySongs(year,artist,singer);
   const c=document.getElementById('party-content');
   let html='';
   if(filtered.length){
@@ -2028,11 +2039,11 @@ function categoryQueryVariants(item,lang,type){
 function devLanguageChanged(value){currentDevLang=value;loadDevSection(currentDevId)}
 function kidsLanguageChanged(value){currentKidsLang=value;loadKidsSection(currentKidsId)}
 async function loadDevotional(){const c=document.getElementById('devotional-content');c.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading devotional songs...</div>';let html=`<div class="filter-row"><label>Language</label><select id="dev-lang-select" onchange="devLanguageChanged(this.value)">${languageOptionsHtml(currentDevLang)}</select></div><div class="god-grid">`;for(const d of DEV_CATEGORIES){html+=`<div class="god-card" onclick="loadDevSection('${esc(d.id)}')"><div class="g-icon">${d.icon}</div><div class="g-name">${esc(d.name)}</div></div>`;}html+='</div><div id="dev-inner"></div>';c.innerHTML=html;await loadDevSection(currentDevId||DEV_CATEGORIES[0].id);}
-function renderDevSection(){const d=DEV_CATEGORIES.find(x=>x.id===currentDevId);const inner=document.getElementById('dev-inner');if(!d||!inner)return;const songs=uniqueSongs(devSongs);let h=songs.length?`<div class="sec-title">${esc(d.name)}</div><ul class="song-list">`:'';songs.forEach(s=>h+=songItemHtml(s));h+=songs.length?'</ul>':'<div class="empty">No devotional songs found</div>';h+=`<div class="load-more-wrap"><button id="dev-load-more-btn" class="load-more-btn" onclick="loadMoreDevSongs()">Load more ${esc(d.name)} songs</button></div>`;inner.innerHTML=h}
+function renderDevSection(){const d=DEV_CATEGORIES.find(x=>x.id===currentDevId);const inner=document.getElementById('dev-inner');if(!d||!inner)return;const songs=sortByLatestRelevance(devSongs,devSongs,'devotional');let h=songs.length?`<div class="sec-title">${esc(d.name)}</div><ul class="song-list">`:'';songs.forEach(s=>h+=songItemHtml(s));h+=songs.length?'</ul>':'<div class="empty">No devotional songs found</div>';h+=`<div class="load-more-wrap"><button id="dev-load-more-btn" class="load-more-btn" onclick="loadMoreDevSongs()">Load more ${esc(d.name)} songs</button></div>`;inner.innerHTML=h}
 async function loadDevSection(id){const d=DEV_CATEGORIES.find(x=>x.id===id);if(!d)return;currentDevId=id;devSongs=[];devUsedQueries=new Set();document.querySelectorAll('#tab-devotional .god-card').forEach(el=>el.classList.remove('active'));const cards=[...document.querySelectorAll('#tab-devotional .god-card')];const idx=DEV_CATEGORIES.findIndex(x=>x.id===id);if(cards[idx])cards[idx].classList.add('active');const inner=document.getElementById('dev-inner');inner.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading songs...</div>';await loadMoreDevSongs(true);}
 async function loadMoreDevSongs(initial=false){if(isDevLoading)return;const d=DEV_CATEGORIES.find(x=>x.id===currentDevId);if(!d)return;isDevLoading=true;const btn=document.getElementById('dev-load-more-btn');const orig=btn?.textContent||'';if(btn){btn.disabled=true;btn.textContent='Loading more...';}const all=categoryQueryVariants(d,currentDevLang,'devotional');let unused=all.filter(q=>!devUsedQueries.has(q));if(!unused.length){devUsedQueries=new Set();unused=all;}const before=devSongs.length;let attempts=0;while(devSongs.length<before+(initial?8:10)&&unused.length&&attempts<(initial?1:4)){const batch=unused.slice(0,initial?4:5);batch.forEach(q=>devUsedQueries.add(q));const fresh=await multiQuery(batch);devSongs=mergeSongs(devSongs,fresh);unused=all.filter(q=>!devUsedQueries.has(q));attempts++;}renderDevSection();if(btn){btn.disabled=false;btn.textContent=orig;}const added=devSongs.length-before;if(!initial)showToast(added?`Added ${added} devotional songs`:'No more devotional songs found');isDevLoading=false;}
 async function loadKids(){const c=document.getElementById('kids-content');c.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading kids songs...</div>';let html=`<div class="filter-row"><label>Language</label><select id="kids-lang-select" onchange="kidsLanguageChanged(this.value)">${languageOptionsHtml(currentKidsLang)}</select></div><div class="god-grid">`;for(const k of KIDS_CATEGORIES){html+=`<div class="god-card" onclick="loadKidsSection('${esc(k.id)}')"><div class="g-icon">${k.icon}</div><div class="g-name">${esc(k.name)}</div></div>`;}html+='</div><div id="kids-inner"></div>';c.innerHTML=html;await loadKidsSection(currentKidsId||KIDS_CATEGORIES[0].id);}
-function renderKidsSection(){const k=KIDS_CATEGORIES.find(x=>x.id===currentKidsId);const inner=document.getElementById('kids-inner');if(!k||!inner)return;const songs=uniqueSongs(kidsSongs);let h=songs.length?`<div class="sec-title">${esc(k.name)}</div><ul class="song-list">`:'';songs.forEach(s=>h+=songItemHtml(s));h+=songs.length?'</ul>':'<div class="empty">No kids songs found</div>';h+=`<div class="load-more-wrap"><button id="kids-load-more-btn" class="load-more-btn" onclick="loadMoreKidsSongs()">Load more ${esc(k.name)} songs</button></div>`;inner.innerHTML=h}
+function renderKidsSection(){const k=KIDS_CATEGORIES.find(x=>x.id===currentKidsId);const inner=document.getElementById('kids-inner');if(!k||!inner)return;const songs=sortByLatestRelevance(kidsSongs,kidsSongs,'kids');let h=songs.length?`<div class="sec-title">${esc(k.name)}</div><ul class="song-list">`:'';songs.forEach(s=>h+=songItemHtml(s));h+=songs.length?'</ul>':'<div class="empty">No kids songs found</div>';h+=`<div class="load-more-wrap"><button id="kids-load-more-btn" class="load-more-btn" onclick="loadMoreKidsSongs()">Load more ${esc(k.name)} songs</button></div>`;inner.innerHTML=h}
 async function loadKidsSection(id){const k=KIDS_CATEGORIES.find(x=>x.id===id);if(!k)return;currentKidsId=id;kidsSongs=[];kidsUsedQueries=new Set();document.querySelectorAll('#tab-kids .god-card').forEach(el=>el.classList.remove('active'));const cards=[...document.querySelectorAll('#tab-kids .god-card')];const idx=KIDS_CATEGORIES.findIndex(x=>x.id===id);if(cards[idx])cards[idx].classList.add('active');const inner=document.getElementById('kids-inner');inner.innerHTML='<div class="loading"><span class="spinner"></span><br>Loading songs...</div>';await loadMoreKidsSongs(true);}
 async function loadMoreKidsSongs(initial=false){if(isKidsLoading)return;const k=KIDS_CATEGORIES.find(x=>x.id===currentKidsId);if(!k)return;isKidsLoading=true;const btn=document.getElementById('kids-load-more-btn');const orig=btn?.textContent||'';if(btn){btn.disabled=true;btn.textContent='Loading more...';}const all=categoryQueryVariants(k,currentKidsLang,'kids');let unused=all.filter(q=>!kidsUsedQueries.has(q));if(!unused.length){kidsUsedQueries=new Set();unused=all;}const before=kidsSongs.length;let attempts=0;while(kidsSongs.length<before+(initial?8:10)&&unused.length&&attempts<(initial?1:4)){const batch=unused.slice(0,initial?4:5);batch.forEach(q=>kidsUsedQueries.add(q));const fresh=await multiQuery(batch);kidsSongs=mergeSongs(kidsSongs,fresh);unused=all.filter(q=>!kidsUsedQueries.has(q));attempts++;}renderKidsSection();if(btn){btn.disabled=false;btn.textContent=orig;}const added=kidsSongs.length-before;if(!initial)showToast(added?`Added ${added} kids songs`:'No more kids songs found');isKidsLoading=false;}
 const _showTab=showTab;showTab=function(tab){_showTab(tab);if(tab==='party')loadParty();if(tab==='devotional')loadDevotional();if(tab==='kids')loadKids();}
