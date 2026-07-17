@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.11 - 2026-07-17
+
+- Fixed lock-screen Play/Pause controls to use the same real pause/resume behavior as the in-app player.
+- Stopped treating normal phone lock/background state as a call interruption.
+- Kept interruption recovery for genuine audio pauses caused by calls or OS audio focus changes.
+
 ## 1.0.10 - 2026-07-17
 
 - Added call/interruption-aware playback recovery.
